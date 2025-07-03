@@ -1,30 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, 
-  signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  updatePassword, reauthenticateWithCredential, EmailAuthProvider
-} from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, query, where, getDocs, getDoc } from 'firebase/firestore';
+// import { createClient } from '@supabase/supabase-js'; // This import is replaced by CDN loading
 
-// Global variables for Firebase configuration provided by the Canvas environment
-// These are accessed safely to avoid 'not defined' errors in local environments.
-const defaultFirebaseConfig = {
-  apiKey: "AIzaSyBDAFhhl9QaKdL_jYZyU_kFynDEp7p0aGg",
-  authDomain: "eagc-bdd12.firebaseapp.com",
-  databaseURL: "https://eagc-bdd12-default-rtdb.firebaseio.com",
-  projectId: "eagc-bdd12",
-  storageBucket: "eagc-bdd12.firebasestorage.app",
-  messagingSenderId: "665706614718",
-  appId: "1:665706614718:web:23adcfdfc9a42e840233ef"
-};
+// --- Supabase Configuration (REPLACE THESE WITH YOUR ACTUAL SUPABASE PROJECT DETAILS) ---
+// IMPORTANT: Ensure these match your Supabase Project URL and Anon Public Key EXACTLY.
+// You can find these in your Supabase Dashboard under Settings -> API.
+// If you are seeing "TypeError: Failed to fetch", it is highly likely these values are incorrect or your Supabase project is not set up.
+const SUPABASE_URL = 'https://gawllbktmwswzmvzzpmq.supabase.co'; // Ensure this is EXACTLY correct
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI';
 
-const firebaseConfig = typeof window !== 'undefined' && typeof window.__firebase_config !== 'undefined'
-  ? JSON.parse(window.__firebase_config)
-  : defaultFirebaseConfig;
-
-const appId = typeof window !== 'undefined' && typeof window.__app_id !== 'undefined' ? window.__app_id : firebaseConfig.projectId;
-const initialAuthToken = typeof window !== 'undefined' && typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
+// Initialize supabase client outside the component to ensure it's a singleton
+// and can be accessed within useEffect cleanup for subscriptions.
+let supabase = null; 
+let supabaseAuthSubscription = null; // To hold the auth subscription object for cleanup
 
 // --- Placeholder Data ---
 // Ensure all data points have 'category', 'module', and 'day' properties
@@ -45,12 +32,12 @@ const placeholderVideos = [
   { id: 'v11_ielts_reading_d1', title: 'IELTS Reading - Day 1 Intro', description: 'Reading Strategies Overview.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', category: 'IELTS', module: 'Reading', day: 'Day 1' },
   { id: 'v12_ielts_reading_d1_p', title: 'IELTS Reading - Day 1 Skimming & Scanning', description: 'Techniques for quick comprehension.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', category: 'IELTS', module: 'Reading', day: 'Day 1' },
   { id: 'v13_ielts_reading_d2', title: 'IELTS Reading - Day 2 Heading Matching', description: 'Matching headings to paragraphs.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', category: 'IELTS', module: 'Reading', day: 'Day 2' },
-  { id: 'v14_ielts_reading_d3', title: 'IELTS Reading - Day 3 True/False/Not Given', description: 'Strategies for detail questions.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', category: 'IELTS', module: 'Reading', day: 'Day 3' },
+  { id: 'v14_ielts_reading_d3', title: 'IELTS Reading - Day 3 True/False/Not Given', description: 'Strategies for detail questions.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', category: 'IELTS', module: 'Reading', day: 'Day 2' },
   
   // IELTS Writing (3 days)
   { id: 'v15_ielts_writing_d1', title: 'IELTS Writing - Day 1 Intro', description: 'Task 1 & Task 2 Overview.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', category: 'IELTS', module: 'Writing', day: 'Day 1' },
   { id: 'v16_ielts_writing_d1_t1', title: 'IELTS Writing - Day 1 Task 1 Report Writing', description: 'Analyzing charts and graphs.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4', category: 'IELTS', module: 'Writing', day: 'Day 1' },
-  { id: 'v17_ielts_writing_d2', title: 'IELTS Writing - Day 2 Task 2 Essay Structure', description: 'Structuring your argumentative essay.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', category: 'IELTS', module: 'Writing', day: 'Day 2' },
+  { id: 'v17_ielts_writing_d2', title: 'IELTS Writing - Day 2 Essay Structure', description: 'Structuring your argumentative essay.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4', category: 'IELTS', module: 'Writing', day: 'Day 2' },
   { id: 'v18_ielts_writing_d3', title: 'IELTS Writing - Day 3 Cohesion & Coherence', description: 'Linking ideas effectively.', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4', category: 'IELTS', module: 'Writing', day: 'Day 3' },
 
   // IELTS Speaking (3 days)
@@ -154,14 +141,14 @@ const placeholderAssignments = [
   { id: 'a19_pt_speaking_d2', title: 'PTE Speaking Day 2 Assignment', description: 'Re-tell lecture practice.', category: 'PT', module: 'Speaking', day: 'Day 2' },
   { id: 'a20_pt_writing_d1', title: 'PTE Writing Day 1 Assignment', description: 'Summarize a given text.', category: 'PT', module: 'Writing', day: 'Day 1' },
   { id: 'a21_pt_writing_d2', title: 'PTE Writing Day 2 Assignment', description: 'Write an argumentative essay.', category: 'PT', module: 'Writing', day: 'Day 2' },
-  { id: 'a22_pt_reading_d1', title: 'PTE Reading Day 1 Assignment', description: 'Multiple choice, multiple answers.', category: 'PT', module: 'Reading', day: 'Day 1' },
-  { id: 'a23_pt_reading_d2', title: 'PTE Reading Day 2 Assignment', description: 'Highlight correct summary.', category: 'PT', module: 'Reading', day: 'Day 2' },
-  { id: 'a24_pt_listening_d1', title: 'PTE Listening Day 1 Assignment', description: 'Fill in the blanks from audio.', category: 'PT', module: 'Listening', day: 'Day 1' },
-  { id: 'a25_pt_listening_d2', title: 'PTE Listening Day 2 Assignment', description: 'Select missing word.', category: 'PT', module: 'Listening', day: 'Day 2' },
+  { id: 'a22_pt_reading_d1', title: 'PTE Reading Multiple choice, multiple answers.', category: 'PT', module: 'Reading', day: 'Day 1' },
+  { id: 'a23_pt_reading_d2', title: 'PTE Reading Highlight correct summary.', category: 'PT', module: 'Reading', day: 'Day 2' },
+  { id: 'a24_pt_listening_d1', title: 'PTE Listening Fill in the blanks from audio.', category: 'PT', module: 'Listening', day: 'Day 1' },
+  { id: 'a25_pt_listening_d2', title: 'PTE Listening Select missing word.', category: 'PT', module: 'Listening', day: 'Day 2' },
 
   // SAT Assignments (2 days per module)
   { id: 'a26_sat_math_d1', title: 'SAT Math Day 1 Assignment', description: 'Solve practice problems: Heart of Algebra.', category: 'SAT', module: 'Math', day: 'Day 1' },
-  { id: 'a27_sat_math_d2', title: 'SAT Math Day 2 Assignment', description: 'Solve practice problems: Passport to Advanced Math.', category: 'SAT', module: 'Math', day: 'Day 2' },
+  { id: 'a27_sat_math_d2', title: 'SAT Math Day 2 Assignment', 'description': 'Solve practice problems: Passport to Advanced Math.', category: 'SAT', module: 'Math', day: 'Day 2' },
   { id: 'a28_sat_reading_d1', title: 'SAT Reading Day 1 Assignment', description: 'Analyze historical passage.', category: 'SAT', module: 'Reading', day: 'Day 1' },
   { id: 'a29_sat_reading_d2', title: 'SAT Reading Day 2 Assignment', description: 'Analyze science passage.', category: 'SAT', module: 'Reading', day: 'Day 2' },
   { id: 'a30_sat_writing_d1', title: 'SAT Writing Day 1 Assignment', description: 'Identify grammar errors.', category: 'SAT', module: 'Writing', day: 'Day 1' },
@@ -205,29 +192,36 @@ const placeholderWorksheets = [
   { id: 'w23_sat_math_d2', title: 'SAT Math Geometry Problems', description: 'Geometry practice sheets.', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', category: 'SAT', module: 'Math', day: 'Day 2' },
   { id: 'w24_sat_reading_d1', title: 'SAT Reading Practice Passages', description: 'Literature and history passages.', url: 'https://www.africau.edu/images/default/sample.pdf', category: 'SAT', module: 'Reading', day: 'Day 1' },
   { id: 'w25_sat_reading_d2', title: 'SAT Reading Paired Passages', description: 'Practice with comparative passages.', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', category: 'SAT', module: 'Reading', day: 'Day 2' },
-  { id: 'w26_sat_writing_d1', title: 'SAT Writing Grammar Rules', description: 'Grammar cheat sheet.', url: 'https://www.africau.edu/images/default/sample.pdf', category: 'SAT', module: 'Writing', day: 'Day 1' },
+  { id: 'w26_sat_writing_d1', title: 'SAT Writing Grammar Rules', description: 'Grammar cheat sheet.', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', category: 'SAT', module: 'Writing', day: 'Day 1' },
   { id: 'w27_sat_writing_d2', title: 'SAT Writing Essay Prompts.', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', category: 'SAT', module: 'Writing', day: 'Day 2' },
 ];
 
 
 const App = () => {
-  const [firebaseApp, setFirebaseApp] = useState(null);
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
+  // Auth specific states
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState(''); // Corrected: was missing useState
+  const [fullName, setFullName] = useState(''); 
+  const [isLoginView, setIsLoginView] = useState(true);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false); 
+  const [newPassword, setNewPassword] = useState('');
+  const [currentPasswordForReauth, setCurrentPasswordForReauth] = useState(''); 
+
   const [userId, setUserId] = useState(null);
-  const [userName, setUserName] = useState(null); // New state for user's full name
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [userName, setUserName] = useState(null); 
+  const [isSupabaseClientReady, setIsSupabaseClientReady] = useState(false); // New state for client readiness
+  const [isAuthDataLoaded, setIsAuthDataLoaded] = useState(false); // New state for auth listener completion
   const [appState, setAppState] = useState('loading');
-  const [filterCategory, setFilterCategory] = useState('All'); // Used as the currently selected course for content display
+  const [filterCategory, setFilterCategory] = useState('All'); 
   const [filterModule, setFilterModule] = useState('All');
   const [filterDay, setFilterDay] = useState('All');
   const [contentTab, setContentTab] = useState('videos');
-  const [isAdmin, setIsAdmin] = useState(false); // New state for admin status
+  const [isAdmin, setIsAdmin] = useState(false); 
 
   const [videos, setVideos] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [worksheets, setWorksheets] = useState([]); // New state for worksheets
+  const [worksheets, setWorksheets] = useState([]); 
 
   const [selectedVideoUrl, setSelectedVideoUrl] = useState(null);
   const [currentQuiz, setCurrentQuiz] = useState(null);
@@ -238,149 +232,385 @@ const App = () => {
   const [quizResults, setQuizResults] = useState([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState(null);
-  const [registeredExams, setRegisteredExams] = useState([]); // Exams user is registered for
-  const [selectedExamsForRegistration, setSelectedExamsForRegistration] = useState([]); // Exams selected during registration process
+  const [registeredExams, setRegisteredExams] = useState([]); 
+  const [selectedExamsForRegistration, setSelectedExamsForRegistration] = useState([]); 
 
-  // Auth specific states
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState(''); // New state for full name during registration
-  const [isLoginView, setIsLoginView] = useState(true);
-  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false); 
-  const [newPassword, setNewPassword] = useState('');
-  const [currentPasswordForReauth, setCurrentPasswordForReauth] = useState(''); // For reauthentication
-
-  // States for adding new video manually
+  // States for adding new content (Admin specific)
   const [newVideoTitle, setNewVideoTitle] = useState('');
   const [newVideoDescription, setNewVideoDescription] = useState('');
   const [newVideoUrl, setNewVideoUrl] = useState('');
-  const [newVideoCategory, setNewVideoCategory] = useState('IELTS'); // Default to IELTS
-  const [newVideoModule, setNewVideoModule] = useState('Listening'); // Default to Listening
-  const [newVideoDay, setNewVideoDay] = useState('Day 1'); // Default to Day 1
+  const [newVideoFile, setNewVideoFile] = useState(null); // For file uploads
+  const [newVideoCategory, setNewVideoCategory] = useState('IELTS'); 
+  const [newVideoModule, setNewVideoModule] = useState('Listening'); 
+  const [newVideoDay, setNewVideoDay] = useState('Day 1'); 
 
-  // Refs to store Firestore collection paths
-  const quizCollectionPathRef = useRef(null);
-  const videoCollectionPathRef = useRef(null);
-  const assignmentCollectionPathRef = useRef(null);
-  const worksheetCollectionPathRef = useRef(null); // Ref for worksheets
-  const userScoresCollectionPathRef = useRef(null);
-  const userProfilesCollectionPathRef = useRef(null);
+  const [newQuizTitle, setNewQuizTitle] = useState('');
+  const [newQuizDescription, setNewQuizDescription] = useState('');
+  const [newQuizCategory, setNewQuizCategory] = useState('IELTS');
+  const [newQuizModule, setNewQuizModule] = useState('Listening');
+  const [newQuizDay, setNewQuizDay] = useState('Day 1');
+  const [newQuizQuestions, setNewQuizQuestions] = useState([{ questionText: '', options: ['', '', '', ''], correctAnswer: '' }]);
 
+  const [newAssignmentTitle, setNewAssignmentTitle] = useState('');
+  const [newAssignmentDescription, setNewAssignmentDescription] = useState('');
+  const [newAssignmentCategory, setNewAssignmentCategory] = useState('IELTS');
+  const [newAssignmentModule, setNewAssignmentModule] = useState('Listening');
+  const [newAssignmentDay, setNewAssignmentDay] = useState('Day 1');
 
-  // Initialize Firebase and set up authentication listener
+  // Add this console log to see app state on every render - Moved after useState declarations
+  console.log("App component rendered. Current appState:", appState, "isAdmin:", isAdmin, "userId:", userId);
+
+  // Supabase tables (no need for refs, directly use string names)
+  const USER_PROFILES_TABLE = 'user_profiles';
+  const VIDEOS_TABLE = 'videos';
+  const QUIZZES_TABLE = 'quizzes';
+  const ASSIGNMENTS_TABLE = 'assignments';
+  const WORKSHEETS_TABLE = 'worksheets';
+  const USER_SCORES_TABLE = 'user_scores';
+  const VIDEO_STORAGE_BUCKET = 'studyprep-videos'; // Supabase Storage Bucket name
+
+  // Function to add sample data to Supabase if tables are empty
+  const addSampleDataToSupabase = async (tableName, placeholderData) => {
+      try {
+          console.log(`Checking '${tableName}' for existing data...`);
+          const { count, error: countError } = await supabase
+              .from(tableName)
+              .select('count()', { head: true }); // Check if any rows exist
+
+          if (countError) {
+              console.error(`Supabase count error for '${tableName}':`, countError.message, countError.details, countError.hint);
+              throw countError;
+          }
+
+          if (count === 0) {
+              console.log(`Adding placeholder data to '${tableName}'...`);
+              const { error: insertError } = await supabase
+                  .from(tableName)
+                  .insert(placeholderData);
+              if (insertError) {
+                  console.error(`Supabase insert error for '${tableName}':`, insertError.message, insertError.details, insertError.hint);
+                  throw insertError;
+              }
+              console.log(`Placeholder data added to '${tableName}'.`);
+          } else {
+              console.log(`'${tableName}' already contains data. Skipping sample data insertion.`);
+          }
+      } catch (error) {
+          console.error(`Error managing sample data for '${tableName}':`, error.message, error);
+          // Do NOT set message here as it might overwrite more critical messages from auth
+          // setMessage(`Error populating sample data for ${tableName}: ${error.message}`);
+      }
+  };
+
+  const fetchContent = async () => {
+      try {
+          console.log("Fetching content from Supabase...");
+          
+          await addSampleDataToSupabase(VIDEOS_TABLE, placeholderVideos);
+          await addSampleDataToSupabase(QUIZZES_TABLE, sampleQuizzes);
+          await addSampleDataToSupabase(ASSIGNMENTS_TABLE, placeholderAssignments);
+          await addSampleDataToSupabase(WORKSHEETS_TABLE, placeholderWorksheets);
+
+          const { data: videosData, error: videosError } = await supabase.from(VIDEOS_TABLE).select('*');
+          if (videosError) {
+              console.error("Supabase videos fetch error:", videosError.message, videosError.details, videosError.hint);
+              throw videosError;
+          }
+          setVideos(videosData);
+          console.log("Videos fetched. Count:", videosData.length);
+
+          const { data: quizzesData, error: quizzesError } = await supabase.from(QUIZZES_TABLE).select('*');
+          if (quizzesError) {
+              console.error("Supabase quizzes fetch error:", quizzesError.message, quizzesError.details, quizzesError.hint);
+              throw quizzesError;
+          }
+          setQuizzes(quizzesData);
+          console.log("Quizzes fetched. Count:", quizzesData.length);
+
+          const { data: assignmentsData, error: assignmentsError } = await supabase.from(ASSIGNMENTS_TABLE).select('*');
+          if (assignmentsError) {
+              console.error("Supabase assignments fetch error:", assignmentsError.message, assignmentsError.details, assignmentsError.hint);
+              throw assignmentsError;
+          }
+          setAssignments(assignmentsData);
+          console.log("Assignments fetched. Count:", assignmentsData.length);
+
+          const { data: worksheetsData, error: worksheetsError } = await supabase.from(WORKSHEETS_TABLE).select('*');
+          if (worksheetsError) {
+              console.error("Supabase worksheets fetch error:", worksheetsError.message, worksheetsError.details, worksheetsError.hint);
+              throw worksheetsError;
+          }
+          setWorksheets(worksheetsData);
+          console.log("Worksheets fetched. Count:", worksheetsData.length);
+
+      } catch (error) {
+          console.error("Error fetching content from Supabase:", error);
+          setMessage(`Error loading content: ${error.message}. Check Supabase credentials and RLS policies.`);
+      }
+  };
+
+  // Effect 1: Load Supabase script and initialize client once.
   useEffect(() => {
-    console.log("1. useEffect for Firebase init triggered.");
-    if (!firebaseConfig.projectId) {
-      console.error("Firebase 'projectId' is missing in config. Cannot initialize Firebase.");
-      setMessage("Firebase initialization failed: Project ID is missing. Please check your Firebase configuration.");
+    console.log("1. useEffect for Supabase script load triggered.");
+    
+    const loadSupabaseScript = () => {
+      if (window.supabase && typeof window.supabase.createClient === 'function') {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Supabase client initialized from global object.");
+        console.log("Supabase URL:", SUPABASE_URL);
+        console.log("Supabase Anon Key (first 5 chars):", SUPABASE_ANON_KEY.substring(0, 5) + '...');
+        // --- RESTORED WARNING CONDITION HERE ---
+        if (SUPABASE_URL === 'https://ummnkynnwlkmzacycupc.supabase.co' || SUPABASE_ANON_KEY.startsWith('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbW5reW5ubHdrbXphY3ljdXBj')) {
+          console.warn("WARNING: Supabase URL or Anon Key are still default placeholders. Please replace them with your actual Supabase project credentials for the app to function correctly.");
+          setMessage("WARNING: Supabase credentials are placeholders. Update them in App.js.");
+        }
+        // --- END RESTORED WARNING CONDITION ---
+        setIsSupabaseClientReady(true);
+      } else {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+        script.async = true;
+        script.onload = () => {
+          if (window.supabase && typeof window.supabase.createClient === 'function') {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log("Supabase client initialized after script load.");
+            console.log("Supabase URL:", SUPABASE_URL);
+            console.log("Supabase Anon Key (first 5 chars):", SUPABASE_ANON_KEY.substring(0, 5) + '...');
+            // --- RESTORED WARNING CONDITION HERE ---
+            if (SUPABASE_URL === 'https://ummnkynnwlkmzacycupc.supabase.co' || SUPABASE_ANON_KEY.startsWith('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbW5reW5ubHdrbXphY3ljdXBj')) {
+              console.warn("WARNING: Supabase URL or Anon Key are still default placeholders. Please replace them with your actual Supabase project credentials for the app to function correctly.");
+              setMessage("WARNING: Supabase credentials are placeholders. Update them in App.js.");
+            }
+            // --- END RESTORED WARNING CONDITION ---
+            setIsSupabaseClientReady(true);
+          } else {
+            console.error("Supabase createClient not found on window object after script load.");
+            setMessage("App initialization failed: Supabase client not found.");
+            setIsSupabaseClientReady(true); // Still set to true to unblock loading, but indicate error
+            setAppState('auth_email_password');
+          }
+        };
+        script.onerror = (e) => {
+          console.error("Failed to load Supabase script from CDN.", e);
+          setMessage("App initialization failed: Could not load Supabase library. Check your internet connection or CDN access.");
+          setIsSupabaseClientReady(true); // Still set to true to unblock loading, but indicate error
+          setAppState('auth_email_password');
+        };
+        document.head.appendChild(script);
+      }
+    };
+
+    loadSupabaseScript();
+    
+    // No cleanup for script itself, it's a global dependency.
+    // Auth subscription cleanup will be in the next useEffect.
+  }, []); // Runs once on mount
+
+
+  // Effect 2: Attach Auth listener once Supabase client is ready.
+  useEffect(() => {
+    console.log("2. useEffect for Auth Listener triggered. isSupabaseClientReady:", isSupabaseClientReady);
+    if (!isSupabaseClientReady) {
+      return; // Wait until Supabase client is definitely ready
+    }
+
+    if (!supabase || !supabase.auth || !supabase.from) {
+      console.error("Supabase client is not properly initialized for auth listener. Check SUPABASE_URL and SUPABASE_ANON_KEY.");
+      setMessage("App initialization failed: Supabase client not ready. Ensure URL and Key are set.");
       setAppState('auth_email_password');
-      setIsAuthReady(true);
+      setIsAuthDataLoaded(true); // Unblock app even if auth setup fails
       return;
     }
 
-    try {
-      const app = initializeApp(firebaseConfig);
-      console.log("2. Firebase app initialized.");
-      const firestore = getFirestore(app);
-      const firebaseAuth = getAuth(app);
+    // Supabase Auth Listener
+    // Store the subscription in the global variable for cleanup
+    supabaseAuthSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("3. Auth listener received event:", event, "Session:", session);
+      if (session) {
+        const user = session.user;
+        setUserId(user.id);
 
-      setFirebaseApp(app);
-      setDb(firestore);
-      setAuth(firebaseAuth);
+        try {
+          console.log("Attempting to get user profile from Supabase for ID:", user.id);
+          const { data: profileData, error: profileError } = await supabase
+            .from(USER_PROFILES_TABLE)
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-      const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-        console.log("3. Auth listener attached. User object in onAuthStateChanged:", user);
-        if (user) {
-          setUserId(user.uid);
-          userProfilesCollectionPathRef.current = `/artifacts/${appId}/users/${user.uid}/userProfiles`;
-          const userProfileDocRef = doc(firestore, userProfilesCollectionPathRef.current, user.uid);
-          console.log("Attempting to get user profile doc:", userProfileDocRef.path);
-          
-          try {
-            const docSnap = await getDoc(userProfileDocRef);
-            if (docSnap.exists()) {
-              const profileData = docSnap.data();
-              console.log("User profile data from Firestore:", profileData); // Debug log
-
-              // Determine a safe 'createdAt' date string for calculations
-              const effectiveCreationDate = (profileData.createdAt && !isNaN(new Date(profileData.createdAt)))
-                ? profileData.createdAt
-                : new Date().toISOString(); // Fallback to current date if createdAt is missing or invalid
-
-              // Handle both old string format and new object format for registeredExams
-              const currentRegisteredExams = (profileData.registeredExams || []).map(exam => {
-                if (typeof exam === 'string') {
-                  // For old string format, convert to object with a default expiration (e.g., 90 days from creation)
-                  return { name: exam, expiration: new Date(Date.parse(effectiveCreationDate) + 90 * 24 * 60 * 60 * 1000).toISOString() };
-                }
-                return exam; // Already in object format
-              });
-              console.log("Processed registeredExams:", currentRegisteredExams); // Debug log
-
-              setRegisteredExams(currentRegisteredExams);
-              setSelectedExamsForRegistration(currentRegisteredExams.map(e => e.name)); // For the selection UI
-              setIsAdmin(profileData.isAdmin || false); 
-              setUserName(profileData.fullName || user.email); // Set user's full name or email
-
-              if (currentRegisteredExams.length > 1) {
-                setAppState('dashboard'); 
-              } else if (currentRegisteredExams.length === 1) {
-                setAppState(`${currentRegisteredExams[0].name.toLowerCase()}_home`); 
-                setFilterCategory(currentRegisteredExams[0].name);
-                setFilterModule('All');
-                setFilterDay('All');
-              } else {
-                setAppState('registration'); 
-              }
-            } else {
-              // New user profile: create with default isAdmin: false, empty exams, and provided fullName
-              const newProfileCreatedAt = new Date().toISOString();
-              console.log("User profile does not exist. Creating new profile for UID:", user.uid);
-              await setDoc(userProfileDocRef, { 
-                registeredExams: [], 
-                isAdmin: false, 
-                createdAt: newProfileCreatedAt, // Ensure it's explicitly set
-                fullName: fullName || user.email // Save the full name, or default to email
-              });
-              setIsAdmin(false);
-              setUserName(fullName || user.email);
-              setAppState('registration'); 
-              console.log("Creating new user profile with data:", { registeredExams: [], isAdmin: false, createdAt: newProfileCreatedAt, fullName: fullName || user.email }); // Debug log
-            }
-          } catch (profileError) {
-            console.error("Error fetching or creating user profile in onAuthStateChanged:", profileError);
+          if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means "No rows found"
+            console.error("Error fetching user profile:", profileError.message, profileError.details, profileError.hint);
             setMessage(`Error loading user profile: ${profileError.message}`);
-            setAppState('registration');
-          } finally {
-            setIsAuthReady(true);
-            console.log("isAuthReady set to true.");
+            // If profile fails to load, but user is authenticated, keep them on login to resolve
+            setAppState('auth_email_password');
+            setIsAuthDataLoaded(true); // Ensure loading state is cleared
+            return;
           }
 
-        } else {
-          console.log("No user is authenticated. Setting appState to auth_email_password.");
-          setUserId(null);
-          setUserName(null); // Clear user name on logout
-          setRegisteredExams([]);
-          setSelectedExamsForRegistration([]);
-          setIsAdmin(false); 
+          let currentIsAdmin = false;
+          let currentUserName = user.email;
+          let currentRegisteredExams = [];
+
+          if (profileData) {
+            console.log("User profile data from Supabase:", profileData);
+            currentIsAdmin = profileData.is_admin || false; // This line is crucial
+            // --- NEW LOG HERE ---
+            console.log("DEBUG: is_admin from Supabase profile:", profileData.is_admin, "-> setting isAdmin state to:", currentIsAdmin); 
+            // --- END NEW LOG ---
+            currentUserName = profileData.full_name || user.email;
+
+            const effectiveCreationDate = (profileData.created_at && !isNaN(new Date(profileData.created_at)))
+              ? profileData.created_at
+              : new Date().toISOString(); 
+            
+            currentRegisteredExams = (profileData.registered_exams || []).map(exam => {
+              if (typeof exam === 'string') {
+                return { name: exam, expiration: new Date(Date.parse(effectiveCreationDate) + 90 * 24 * 60 * 60 * 1000).toISOString() };
+              }
+              return exam;
+            });
+            console.log("Processed registeredExams:", currentRegisteredExams);
+
+          } else {
+            // New user profile: create with default isAdmin: false, empty exams, and provided fullName
+            const newProfileCreatedAt = new Date().toISOString();
+            console.log("User profile does not exist in DB. Creating new profile for UID:", user.id);
+            const { error: insertError } = await supabase
+              .from(USER_PROFILES_TABLE)
+              .insert({ 
+                id: user.id,
+                full_name: fullName || user.email,
+                is_admin: false, // Explicitly set to false here for new sign-ups
+                created_at: newProfileCreatedAt, 
+                registered_exams: []
+              });
+            
+            if (insertError) {
+              console.error("Error creating new user profile:", insertError.message, insertError.details, insertError.hint);
+              setMessage(`Error creating profile: ${insertError.message}`);
+              setAppState('auth_email_password');
+              setIsAuthDataLoaded(true); // Ensure loading state is cleared
+              return;
+            }
+            currentIsAdmin = false; // This line is also crucial
+            console.log("Value of is_admin for new profile (default false):", currentIsAdmin); // NEW LOG
+            currentUserName = fullName || user.email;
+            currentRegisteredExams = [];
+            console.log("New user profile created.");
+          }
+          
+          // Set all states AFTER fetching and processing profile data
+          setIsAdmin(currentIsAdmin); // This sets the state
+          setUserName(currentUserName);
+          setRegisteredExams(currentRegisteredExams);
+          setSelectedExamsForRegistration(currentRegisteredExams.map(e => e.name)); 
+          console.log(`isAdmin state set to: ${currentIsAdmin} for user: ${currentUserName}`);
+
+          if (currentRegisteredExams.length > 1) {
+            setAppState('dashboard'); 
+          } else if (currentRegisteredExams.length === 1) {
+            setAppState(`${currentRegisteredExams[0].name.toLowerCase()}_home`); 
+            setFilterCategory(currentRegisteredExams[0].name);
+            setFilterModule('All');
+            setFilterDay('All');
+          } else {
+            setAppState('registration'); 
+          }
+          setIsAuthDataLoaded(true); // Auth and profile data are now loaded
+          console.log("isAuthDataLoaded set to true.");
+
+          // --- IMPORTANT CHANGE: Call fetchContent here after auth is fully processed ---
+          await fetchContent(); // Fetch content only after user is authenticated and profile loaded
+
+        } catch (dbError) {
+          console.error("Supabase DB operation error in onAuthStateChange:", dbError);
+          setMessage(`Database error: ${dbError.message}`);
           setAppState('auth_email_password');
-          setIsAuthReady(true);
+          setIsAuthDataLoaded(true); // Ensure loading state is cleared even on error
         }
-      });
 
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Critical Error during Firebase initialization in useEffect:", error);
-      setMessage(`Firebase initialization failed: ${error.message}. Please check console.`);
-      setAppState('auth_email_password');
-      setIsAuthReady(true);
+      } else {
+        console.log("Auth listener: No user session detected. User is logged out.");
+        setUserId(null);
+        setUserName(null);
+        setRegisteredExams([]);
+        setSelectedExamsForRegistration([]);
+        setIsAdmin(false); // This should set isAdmin to false
+        setAppState('auth_email_password');
+        setIsAuthDataLoaded(true); // Auth data (or lack thereof) is loaded
+        console.log("Auth listener: States reset. isAdmin is now:", false, "appState is now:", 'auth_email_password');
+      }
+    });
+
+    // Cleanup subscription on component unmount
+    return () => {
+      console.log("Cleaning up Supabase auth subscription.");
+      if (supabaseAuthSubscription) {
+          supabaseAuthSubscription.unsubscribe();
+      }
+    };
+  }, [isSupabaseClientReady]); // CHANGED: Removed fullName from dependency array
+
+
+  // NEW EFFECT: Add Cache-Control meta tags to prevent aggressive browser caching
+  useEffect(() => {
+    // Check if meta tags already exist to prevent duplicates
+    const existingCacheControl = document.querySelector('meta[http-equiv="Cache-Control"]');
+    const existingPragma = document.querySelector('meta[http-equiv="Pragma"]');
+    const existingExpires = document.querySelector('meta[http-equiv="Expires"]');
+
+    if (!existingCacheControl) {
+      const metaCacheControl = document.createElement('meta');
+      metaCacheControl.setAttribute('http-equiv', 'Cache-Control');
+      metaCacheControl.setAttribute('content', 'no-cache, no-store, must-revalidate');
+      document.head.appendChild(metaCacheControl);
     }
-  }, []);
+    if (!existingPragma) {
+      const metaPragma = document.createElement('meta');
+      metaPragma.setAttribute('http-equiv', 'Pragma');
+      metaPragma.setAttribute('content', 'no-cache');
+      document.head.appendChild(metaPragma);
+    }
+    if (!existingExpires) {
+      const metaExpires = document.createElement('meta');
+      metaExpires.setAttribute('http-equiv', 'Expires');
+      metaExpires.setAttribute('content', '0');
+      document.head.appendChild(metaExpires);
+    }
 
-  // Authentication functions (Email/Password)
+    // Cleanup function to remove the meta tags if the component unmounts
+    // (though for a root App component, this is less critical)
+    return () => {
+      const cacheControl = document.querySelector('meta[http-equiv="Cache-Control"]');
+      const pragma = document.querySelector('meta[http-equiv="Pragma"]');
+      const expires = document.querySelector('meta[http-equiv="Expires"]');
+      if (cacheControl) document.head.removeChild(cacheControl);
+      if (pragma) document.head.removeChild(pragma);
+      if (expires) document.head.removeChild(expires);
+    };
+  }, []); // Empty dependency array means this runs once on mount
+
+
+  // --- REMOVED EFFECT 3: Content loading is now handled directly within Effect 2's onAuthStateChange callback ---
+  // useEffect(() => {
+  //   console.log("4. Content loading useEffect triggered. isAuthDataLoaded:", isAuthDataLoaded, "userId:", userId);
+  //   if (!isAuthDataLoaded) {
+  //       console.log("Skipping content load: Auth data not loaded yet.");
+  //       return;
+  //   }
+  //   if (!supabase) {
+  //       console.warn("Supabase client not available for content load.");
+  //       setMessage("Content loading failed: Supabase client not initialized.");
+  //       return; // Should not happen if isAuthDataLoaded is true, but good safeguard
+  //   }
+  //   fetchContent();
+  // }, [isAuthDataLoaded, userId]); // Depend on auth data being loaded and userId
+
+
+  // Authentication functions (Email/Password) - Now using Supabase Auth
   const handleEmailRegister = async () => {
     setMessage('');
-    if (!email || !password || !fullName) { // Full name is now required for registration
+    if (!email || !password || !fullName) { 
       setMessage('Please enter your full name, email, and password.');
       return;
     }
@@ -388,35 +618,36 @@ const App = () => {
         setMessage('Password must be at least 6 characters long.');
         return;
     }
+    if (!supabase) { // Use the global supabase client directly
+      setMessage('Supabase client not ready. Please try again.');
+      console.error("Supabase client not available for registration.");
+      return;
+    }
     try {
-      console.log("Attempting to register user with email:", email);
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log("User registered successfully:", userCredential.user.uid);
-      
-      // Create user profile in Firestore with default isAdmin: false and provided fullName
-      const userProfileDocRef = doc(db, `/artifacts/${appId}/users/${userCredential.user.uid}/userProfiles`, userCredential.user.uid);
-      await setDoc(userProfileDocRef, { 
-        registeredExams: [], 
-        isAdmin: false, 
-        createdAt: new Date().toISOString(),
-        fullName: fullName // Save the full name
+      console.log("Attempting to register user with email via Supabase:", email);
+      // Supabase's signUp will automatically insert into auth.users.
+      // The onAuthStateChange listener will then handle creating the profile in public.user_profiles
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: { // This data goes into the auth.users metadata
+            full_name: fullName 
+          }
+        }
       });
-      console.log("User profile created for new registration.");
-      
-      setMessage('Registration successful! Signing in...');
-      // onAuthStateChanged listener will handle redirection
-    } catch (error) {
-      console.error("Error during email registration:", error);
-      if (error.code === 'auth/operation-not-allowed') {
-        setMessage('Registration error: Email/Password sign-in is not enabled. Please enable it in your Firebase project settings (Authentication -> Sign-in method).');
-      } else if (error.code === 'auth/email-already-in-use') {
-        setMessage('Registration error: This email is already in use. Please log in or use a different email.');
-      } else if (error.code === 'auth/weak-password') {
-        setMessage('Registration error: ' + error.message);
-      }
-      else {
+
+      if (error) {
+        console.error("Error during Supabase registration:", error.message, error.details, error.hint);
         setMessage(`Registration error: ${error.message}`);
+        return;
       }
+      
+      console.log("User registered successfully via Supabase:", data.user?.id);
+      setMessage('Registration successful! Please check your email to confirm your account (if email confirmation is enabled in Supabase settings).');
+    } catch (error) {
+      console.error("Unexpected error during Supabase registration:", error);
+      setMessage(`Registration error: ${error.message}`);
     }
   };
 
@@ -426,52 +657,70 @@ const App = () => {
       setMessage('Please enter both email and password.');
       return;
     }
+    if (!supabase) {
+      setMessage('Supabase client not ready. Please try again.');
+      console.error("Supabase client not available for login.");
+      return;
+    }
     try {
-      console.log("Attempting to log in user with email:", email);
-      await signInWithEmailAndPassword(auth, email, password);
-      console.log("User logged in successfully.");
-      setMessage('Login successful! Redirecting...');
-      // onAuthStateChanged listener will handle redirection
-    } catch (error) {
-      console.error("Error during email login:", error);
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+      console.log("Attempting to log in user with email via Supabase:", email);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        console.error("Error during Supabase login:", error.message, error.details, error.hint);
         setMessage('Login error: Invalid email or password.');
-      } else if (error.code === 'auth/operation-not-allowed') {
-        setMessage('Login error: Email/Password sign-in is not enabled. Please enable it in your Firebase project settings (Authentication -> Sign-in method).');
-      } else {
-        setMessage(`Login error: ${error.message}`);
+        return;
       }
+      
+      console.log("User logged in successfully via Supabase:", data.user?.id);
+      setMessage('Login successful! Redirecting...');
+    } catch (error) {
+      console.error("Unexpected error during Supabase login:", error);
+      setMessage(`Login error: ${error.message}`);
     }
   };
 
-  // Logout function
   const handleLogout = async () => {
-    if (auth) {
-      try {
-        console.log("Attempting to log out user.");
-        await signOut(auth);
-        console.log("User logged out successfully.");
-        setMessage('You have been logged out.');
-        setEmail(''); // Clear email/password on logout
-        setPassword('');
-        setFullName(''); // Clear full name on logout
-      } catch (error) {
-        console.error("Error during logout:", error);
+    setMessage(''); // Clear any previous messages
+    if (!supabase) {
+      setMessage('Supabase client not ready. Please try again.');
+      console.error("Logout failed: Supabase client not available.");
+      return;
+    }
+    try {
+      console.log("Attempting to log out user via Supabase.");
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Error during Supabase logout:", error.message, error.details, error.hint);
         setMessage(`Logout error: ${error.message}`);
+        return;
       }
-    } else {
-      setMessage("Cannot log out, authentication service not active.");
+      console.log("User logged out successfully via Supabase.");
+      setMessage('You have been logged out.');
+      // Reset state for unauthenticated user
+      setUserId(null);
+      setUserName(null); 
+      setRegisteredExams([]);
+      setSelectedExamsForRegistration([]);
+      setIsAdmin(false); 
+      setAppState('auth_email_password');
+      setEmail(''); 
+      setPassword('');
+      setFullName(''); 
+      console.log("Logout: Local states reset.");
+    } catch (error) {
+      console.error("Unexpected error during Supabase logout:", error);
+      setMessage(`Logout error: ${error.message}`);
     }
   };
 
-  // Change Password Function
   const handleChangePassword = async () => {
     setMessage('');
     if (!newPassword || !currentPasswordForReauth) {
       setMessage('Please enter both current and new password.');
       return;
     }
-    if (!auth.currentUser) {
+    if (!userId) {
       setMessage('No user is logged in.');
       return;
     }
@@ -479,171 +728,42 @@ const App = () => {
       setMessage('New password should be at least 6 characters.');
       return;
     }
+    if (!supabase) {
+      setMessage('Supabase client not ready. Please try again.');
+      return;
+    }
 
     try {
-      console.log("Attempting to change password for user:", auth.currentUser.email);
-      // Reauthenticate with current credentials
-      const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPasswordForReauth);
-      await reauthenticateWithCredential(auth.currentUser, credential);
-      console.log("User reauthenticated successfully.");
+      console.log("Attempting to change password via Supabase for user ID:", userId);
+      // Supabase's updateUser handles reauthentication implicitly.
+      const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        console.error("Error changing password via Supabase:", error.message, error.details, error.hint);
+        setMessage(`Error changing password: ${error.message}`);
+        return;
+      }
       
-      await updatePassword(auth.currentUser, newPassword);
-      console.log("Password updated successfully.");
+      console.log("Password updated successfully via Supabase.");
       setMessage('Password updated successfully!');
       setNewPassword('');
       setCurrentPasswordForReauth('');
       setShowChangePasswordModal(false);
     } catch (error) {
-      console.error("Error changing password:", error);
-      if (error.code === 'auth/requires-recent-login') {
-        setMessage('Please re-enter your current password (session expired or security sensitive operation).');
-      } else if (error.code === 'auth/wrong-password') {
-        setMessage('Incorrect current password.');
-      } else if (error.code === 'auth/weak-password') {
-        setMessage('New password: ' + error.message);
-      }
-      else {
-        setMessage(`Error changing password: ${error.message}`);
-      }
+      console.error("Unexpected error during Supabase password change:", error);
+      setMessage(`Error changing password: ${error.message}`);
     }
   };
-
-
-  // Load content (videos, quizzes, assignments, worksheets) and initialize sample data if necessary
-  useEffect(() => {
-    // Only proceed if db, auth is ready and userId is set
-    if (!db || !auth || !isAuthReady || !userId) {
-        console.log("Skipping content load useEffect: DB or Auth not ready, or userId is null.");
-        return;
-    }
-    console.log("4. Content loading useEffect triggered for userId:", userId);
-
-    const basePublicPath = `/artifacts/${appId}/public/data`;
-    videoCollectionPathRef.current = `${basePublicPath}/videos`;
-    quizCollectionPathRef.current = `${basePublicPath}/quizzes`;
-    assignmentCollectionPathRef.current = `${basePublicPath}/assignments`;
-    worksheetCollectionPathRef.current = `${basePublicPath}/worksheets`; 
-    userScoresCollectionPathRef.current = `/artifacts/${appId}/users/${userId}/userScores`;
-    
-    console.log("Firestore Collection Paths initialized:", {
-        videos: videoCollectionPathRef.current,
-        quizzes: quizCollectionPathRef.current,
-        assignments: assignmentCollectionPathRef.current,
-        worksheets: worksheetCollectionPathRef.current,
-        userScores: userScoresCollectionPathRef.current
-    });
-
-
-    const videosCollection = collection(db, videoCollectionPathRef.current);
-    const quizzesCollection = collection(db, quizCollectionPathRef.current);
-    const assignmentsCollection = collection(db, assignmentCollectionPathRef.current);
-    const worksheetsCollection = collection(db, worksheetCollectionPathRef.current);
-
-    const addSampleData = async () => { 
-      try {
-        console.log("Checking if sample data needs to be added.");
-        const videoDocs = await getDocs(videosCollection); 
-        if (videoDocs.empty) {
-          console.log("Adding placeholder videos...");
-          for (const video of placeholderVideos) {
-            await setDoc(doc(videosCollection, video.id), video);
-          }
-          console.log("Placeholder videos added.");
-        }
-
-        const quizDocs = await getDocs(quizzesCollection);
-        if (quizDocs.empty) {
-            console.log("Adding placeholder quizzes...");
-          for (const quiz of sampleQuizzes) {
-            await setDoc(doc(quizzesCollection, quiz.id), quiz);
-          }
-          console.log("Placeholder quizzes added.");
-        }
-
-        const assignmentDocs = await getDocs(assignmentsCollection);
-        if (assignmentDocs.empty) {
-            console.log("Adding placeholder assignments...");
-          for (const assignment of placeholderAssignments) {
-            await setDoc(doc(assignmentsCollection, assignment.id), assignment);
-          }
-          console.log("Placeholder assignments added.");
-        }
-
-        const worksheetDocs = await getDocs(worksheetCollection); 
-        if (worksheetDocs.empty) {
-            console.log("Adding placeholder worksheets...");
-          for (const worksheet of placeholderWorksheets) {
-            await setDoc(doc(worksheetCollection, worksheet.id), worksheet);
-          }
-          console.log("Placeholder worksheets added.");
-        }
-        console.log("Sample data check/addition complete.");
-
-      } catch (error) {
-        console.error("Error adding sample data:", error);
-        setMessage(`Error populating sample data: ${error.message}`);
-      }
-    };
-
-    addSampleData();
-
-    // Setup real-time listeners
-    console.log("Setting up Firestore real-time listeners...");
-    const unsubscribeVideos = onSnapshot(videosCollection, (snapshot) => {
-      const videoList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setVideos(videoList);
-      console.log("Videos updated via onSnapshot. Count:", videoList.length);
-    }, (error) => {
-      console.error("Error fetching videos with onSnapshot:", error);
-      setMessage(`Error fetching videos: ${error.message}`);
-    });
-
-    const unsubscribeQuizzes = onSnapshot(quizzesCollection, (snapshot) => {
-      const quizList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setQuizzes(quizList);
-      console.log("Quizzes updated via onSnapshot. Count:", quizList.length);
-    }, (error) => {
-      console.error("Error fetching quizzes with onSnapshot:", error);
-      setMessage(`Error fetching quizzes: ${error.message}`);
-    });
-
-    const unsubscribeAssignments = onSnapshot(assignmentsCollection, (snapshot) => {
-      const assignmentList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAssignments(assignmentList);
-      console.log("Assignments updated via onSnapshot. Count:", assignmentList.length);
-    }, (error) => {
-      console.error("Error fetching assignments with onSnapshot:", error);
-      setMessage(`Error fetching assignments: ${error.message}`);
-    });
-
-    const unsubscribeWorksheets = onSnapshot(worksheetCollection, (snapshot) => { 
-      const worksheetList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setWorksheets(worksheetList);
-      console.log("Worksheets updated via onSnapshot. Count:", worksheetList.length);
-    }, (error) => {
-      console.error("Error fetching worksheets with onSnapshot:", error);
-      setMessage(`Error fetching worksheets: ${error.message}`);
-    });
-
-
-    return () => {
-      console.log("Cleaning up Firestore listeners.");
-      unsubscribeVideos();
-      unsubscribeQuizzes();
-      unsubscribeAssignments();
-      unsubscribeWorksheets(); 
-    };
-  }, [db, auth, isAuthReady, appId, userId]); // Added auth to dependency array to ensure re-run on auth state changes
 
 
   const handleVideoSelect = (url) => {
     setSelectedVideoUrl(url);
-    setCurrentQuiz(null); // Deselect quiz when video is selected
+    setCurrentQuiz(null); 
     setContentTab('videos');
   };
 
   const startQuiz = (quiz) => {
-    setSelectedVideoUrl(null); // Deselect video when quiz is selected
+    setSelectedVideoUrl(null); 
     setCurrentQuiz(quiz);
     setCurrentQuestionIndex(0);
     setQuizScore(0);
@@ -685,22 +805,28 @@ const App = () => {
   };
 
   const saveQuizScore = async () => {
-    if (!db || !userId || !currentQuiz || !userScoresCollectionPathRef.current) {
-      console.error("Cannot save score: Firebase or user not ready, or quiz not selected.");
+    if (!userId || !currentQuiz || !supabase) {
+      console.error("Cannot save score: User not ready, quiz not selected, or Supabase not ready.");
+      setMessage('Error: Cannot save score. Please try again.');
       return;
     }
 
     try {
-      console.log("Attempting to save quiz score...");
-      const userScoresCollection = collection(db, userScoresCollectionPathRef.current);
-      await addDoc(userScoresCollection, {
-        quizId: currentQuiz.id,
-        quizTitle: currentQuiz.title,
-        score: quizScore,
-        totalQuestions: currentQuiz.questions.length,
-        timestamp: new Date().toISOString(),
-        userId: userId,
-      });
+      console.log("Attempting to save quiz score to Supabase...");
+      const { error } = await supabase
+        .from(USER_SCORES_TABLE)
+        .insert({
+          user_id: userId,
+          quiz_id: currentQuiz.id,
+          quiz_title: currentQuiz.title,
+          score: quizScore,
+          total_questions: currentQuiz.questions.length,
+          timestamp: new Date().toISOString(),
+        });
+      if (error) {
+        console.error("Error saving quiz score:", error.message, error.details, error.hint);
+        throw error;
+      }
       console.log("Quiz score saved successfully.");
       setMessage('Quiz completed! Your score has been saved.');
     } catch (error) {
@@ -727,7 +853,6 @@ const App = () => {
     setConfirmationAction(null);
   };
 
-  // Allows multiple exams to be toggled
   const toggleExamRegistration = (exam) => {
     setSelectedExamsForRegistration(prev =>
       prev.includes(exam) ? prev.filter(e => e !== exam) : [...prev, exam]
@@ -736,45 +861,50 @@ const App = () => {
 
   const handleRegisterExams = async () => {
     setMessage('');
-    if (!db || !userId || !userProfilesCollectionPathRef.current) {
-      setMessage('System error: Firebase or user not ready.');
-      console.error("handleRegisterExams: Firebase or user not ready.");
+    if (!userId) {
+      setMessage('System error: User not authenticated.');
+      console.error("handleRegisterExams: User not authenticated.");
       return;
     }
     if (selectedExamsForRegistration.length === 0) {
       setMessage('Please select at least one exam to register.');
       return;
     }
+    if (!supabase) {
+      setMessage('Supabase client not ready. Please try again.');
+      return;
+    }
 
     try {
       console.log("Attempting to register exams for user:", userId);
-      const userProfileDocRef = doc(db, userProfilesCollectionPathRef.current, userId);
-      // Map selected exam names to objects with expiration dates
       const examsToSave = selectedExamsForRegistration.map(examName => {
-        // If the course was already registered, try to preserve its existing expiration date
         const existingExam = registeredExams.find(e => e.name === examName);
-        if (existingExam && existingExam.expiration && !isNaN(new Date(existingExam.expiration))) {
+        if (existingExam && existingExam.expiration && !isNaN(new Date(existingExam.expiration).getTime())) {
           console.log(`Preserving existing expiration for ${examName}:`, existingExam.expiration);
           return existingExam;
         }
-        // Otherwise, set a new expiration date 7 days from now for testing (was 30)
-        const newExpirationDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const newExpirationDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
         console.log(`Setting new expiration for ${examName}:`, newExpirationDate);
         return { name: examName, expiration: newExpirationDate };
       });
 
-      await setDoc(userProfileDocRef, {
-        registeredExams: examsToSave,
-        lastUpdated: new Date().toISOString(),
-        isAdmin: isAdmin, // Preserve existing admin status
-        fullName: userName || fullName || email // Preserve existing full name, or use registration full name, or email
-      }, { merge: true }); // Use merge to update without overwriting other fields
+      const { error } = await supabase
+        .from(USER_PROFILES_TABLE)
+        .update({ 
+          registered_exams: examsToSave, // Update the JSONB column
+          last_updated: new Date().toISOString()
+        })
+        .eq('id', userId); // Update for the specific user ID
+
+      if (error) {
+        console.error("Error registering exams:", error.message, error.details, error.hint);
+        throw error;
+      }
       
       setRegisteredExams(examsToSave);
       setMessage('Registration successful! Redirecting...');
       console.log("Exams registered/updated successfully:", examsToSave);
       
-      // Dynamic redirection after registration
       if (examsToSave.length > 1) {
         setAppState('dashboard'); 
       } else if (examsToSave.length === 1) { 
@@ -794,68 +924,257 @@ const App = () => {
 
   const handleAddVideo = async () => {
     setMessage('');
-    if (!newVideoTitle || !newVideoUrl || !newVideoCategory || !newVideoModule || !newVideoDay) {
-      setMessage('Please fill all video fields.');
+    if (!newVideoTitle || !newVideoCategory || !newVideoModule || !newVideoDay || (!newVideoUrl && !newVideoFile)) {
+      setMessage('Please fill all required video fields and provide either a URL or a file.');
       return;
     }
-    if (!db || !videoCollectionPathRef.current) {
-      setMessage('Database not ready. Cannot add video.');
+    if (!userId) {
+      setMessage('User not authenticated. Cannot add video.');
+      return;
+    }
+    if (!isAdmin) { // Only admins can add content
+      setMessage('Access denied. Only administrators can add videos.');
+      return;
+    }
+    if (!supabase) {
+      setMessage('Supabase client not ready. Please try again.');
+      return;
+    }
+
+    let video_url_to_save = newVideoUrl;
+
+    if (newVideoFile) {
+        try {
+            console.log("Uploading video file to Supabase Storage...");
+            const fileExtension = newVideoFile.name.split('.').pop();
+            const fileName = `${userId}-${Date.now()}.${fileExtension}`;
+            const filePath = `${fileName}`;
+
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from(VIDEO_STORAGE_BUCKET)
+                .upload(filePath, newVideoFile, {
+                    cacheControl: '3600',
+                    upsert: false // Set to true if you want to allow overwrites
+                });
+
+            if (uploadError) {
+              console.error("Error uploading video file to Supabase Storage:", uploadError.message, uploadError.details, uploadError.hint);
+              throw uploadError;
+            }
+            console.log("Video uploaded to storage:", uploadData);
+
+            // Get public URL of the uploaded file
+            const { data: publicUrlData } = supabase.storage
+                .from(VIDEO_STORAGE_BUCKET)
+                .getPublicUrl(filePath);
+            
+            if (!publicUrlData || !publicUrlData.publicUrl) throw new Error("Could not get public URL for uploaded video.");
+            video_url_to_save = publicUrlData.publicUrl;
+            setMessage('Video file uploaded successfully!');
+
+        } catch (error) {
+            console.error("Error uploading video file to Supabase Storage:", error);
+            setMessage(`Error uploading video file: ${error.message}`);
+            return; // Stop if file upload fails
+        }
+    } else if (!newVideoUrl) {
+      setMessage('Please provide a video URL or upload a file.');
       return;
     }
 
     try {
-      console.log("Attempting to add new video.");
-      const videosCollection = collection(db, videoCollectionPathRef.current);
-      await addDoc(videosCollection, {
-        title: newVideoTitle,
-        description: newVideoDescription,
-        url: newVideoUrl,
-        category: newVideoCategory,
-        module: newVideoModule,
-        day: newVideoDay,
-        timestamp: new Date().toISOString(),
-        addedBy: userId,
-      });
-      console.log("Video added successfully.");
+      console.log("Attempting to add new video to Supabase DB:", video_url_to_save);
+      const { error } = await supabase
+        .from(VIDEOS_TABLE)
+        .insert({
+          id: `vid_${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, // Generate unique ID
+          title: newVideoTitle,
+          description: newVideoDescription,
+          url: video_url_to_save,
+          category: newVideoCategory,
+          module: newVideoModule,
+          day: newVideoDay,
+          timestamp: new Date().toISOString(),
+          added_by: userId,
+        });
+      
+      if (error) {
+        console.error("Error adding video record to Supabase DB:", error.message, error.details, error.hint);
+        throw error;
+      }
+
+      console.log("Video record added successfully to DB.");
       setMessage('Video added successfully!');
+      // Clear form fields
       setNewVideoTitle('');
       setNewVideoDescription('');
       setNewVideoUrl('');
-      // Keep category, module, day for quick successive adds
+      setNewVideoFile(null);
     } catch (error) {
-      console.error("Error adding video:", error);
-      setMessage(`Error adding video: ${error.message}`);
+      console.error("Error adding video record to Supabase DB:", error);
+      setMessage(`Error adding video record: ${error.message}`);
     }
   };
 
-  // Function to switch main content view to a specific course
+  const handleAddQuiz = async () => {
+    setMessage('');
+    if (!newQuizTitle || !newQuizDescription || !newQuizCategory || !newQuizModule || !newQuizDay) {
+      setMessage('Please fill all quiz details.');
+      return;
+    }
+    if (newQuizQuestions.length === 0 || newQuizQuestions.some(q => !q.questionText || q.options.some(opt => !opt) || !q.correctAnswer)) {
+      setMessage('Please ensure all quiz questions have text, options, and a correct answer.');
+      return;
+    }
+    if (!userId) {
+      setMessage('User not authenticated. Cannot add quiz.');
+      return;
+    }
+    if (!isAdmin) { // Only admins can add content
+      setMessage('Access denied. Only administrators can add quizzes.');
+      return;
+    }
+    if (!supabase) {
+      setMessage('Supabase client not ready. Please try again.');
+      return;
+    }
+
+    try {
+      console.log("Attempting to add new quiz to Supabase.");
+      const { error } = await supabase
+        .from(QUIZZES_TABLE)
+        .insert({
+          id: `quiz_${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          title: newQuizTitle,
+          description: newQuizDescription,
+          category: newQuizCategory,
+          module: newQuizModule,
+          day: newQuizDay,
+          questions: newQuizQuestions, // Supabase handles JSONB directly
+          timestamp: new Date().toISOString(),
+          added_by: userId,
+        });
+      
+      if (error) {
+        console.error("Error adding quiz:", error.message, error.details, error.hint);
+        throw error;
+      }
+
+      console.log("Quiz added successfully.");
+      setMessage('Quiz added successfully!');
+      // Clear form fields
+      setNewQuizTitle('');
+      setNewQuizDescription('');
+      setNewQuizCategory('IELTS');
+      setNewQuizModule('Listening');
+      setNewQuizDay('Day 1');
+      setNewQuizQuestions([{ questionText: '', options: ['', '', '', ''], correctAnswer: '' }]);
+    } catch (error) {
+      console.error("Error adding quiz:", error);
+      setMessage(`Error adding quiz: ${error.message}`);
+    }
+  };
+
+  const handleAddAssignment = async () => {
+    setMessage('');
+    if (!newAssignmentTitle || !newAssignmentDescription || !newAssignmentCategory || !newAssignmentModule || !newAssignmentDay) {
+      setMessage('Please fill all assignment details.');
+      return;
+    }
+    if (!userId) {
+      setMessage('User not authenticated. Cannot add assignment.');
+      return;
+    }
+    if (!isAdmin) { // Only admins can add content
+      setMessage('Access denied. Only administrators can add assignments.');
+      return;
+    }
+    if (!supabase) {
+      setMessage('Supabase client not ready. Please try again.');
+      return;
+    }
+
+    try {
+      console.log("Attempting to add new assignment to Supabase.");
+      const { error } = await supabase
+        .from(ASSIGNMENTS_TABLE)
+        .insert({
+          id: `assign_${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          title: newAssignmentTitle,
+          description: newAssignmentDescription,
+          category: newAssignmentCategory,
+          module: newAssignmentModule,
+          day: newAssignmentDay,
+          timestamp: new Date().toISOString(),
+          added_by: userId,
+        });
+      
+      if (error) {
+        console.error("Error adding assignment:", error.message, error.details, error.hint);
+        throw error;
+      }
+
+      console.log("Assignment added successfully.");
+      setMessage('Assignment added successfully!');
+      // Clear form fields
+      setNewAssignmentTitle('');
+      setNewAssignmentDescription('');
+      setNewAssignmentCategory('IELTS');
+      setNewAssignmentModule('Listening');
+      setNewAssignmentDay('Day 1');
+    } catch (error) {
+      console.error("Error adding assignment:", error);
+      setMessage(`Error adding assignment: ${error.message}`);
+    }
+  };
+
+  // Helper for Quiz Question Management
+  const handleQuestionChange = (index, field, value) => {
+    const updatedQuestions = [...newQuizQuestions];
+    updatedQuestions[index][field] = value;
+    setNewQuizQuestions(updatedQuestions);
+  };
+
+  const handleOptionChange = (qIndex, oIndex, value) => {
+    const updatedQuestions = [...newQuizQuestions];
+    updatedQuestions[qIndex].options[oIndex] = value;
+    setNewQuizQuestions(updatedQuestions);
+  };
+
+  const addQuestion = () => {
+    setNewQuizQuestions([...newQuizQuestions, { questionText: '', options: ['', '', '', ''], correctAnswer: '' }]);
+  };
+
+  const removeQuestion = (index) => {
+    const updatedQuestions = newQuizQuestions.filter((_, i) => i !== index);
+    setNewQuizQuestions(updatedQuestions);
+  };
+
+
   const goToCourseHome = (course) => {
     console.log("Navigating to course home:", course);
     setAppState(`${course.toLowerCase()}_home`);
-    setFilterCategory(course); // Set the category filter to the selected course
-    setFilterModule('All'); // Reset module filter
-    setFilterDay('All'); // Reset day filter
-    setSelectedVideoUrl(null); // Clear any active video
-    setCurrentQuiz(null); // Clear any active quiz
-    setContentTab('videos'); // Default to videos tab
+    setFilterCategory(course); 
+    setFilterModule('All'); 
+    setFilterDay('All'); 
+    setSelectedVideoUrl(null); 
+    setCurrentQuiz(null); 
+    setContentTab('videos'); 
   };
 
 
   const applyContentFilters = (contentList) => {
-    // If no exams registered or no user, show nothing
-    if (registeredExams.length === 0 && !userId) {
+    // Only filter if auth data has been loaded. If not loaded, it means user is still loading or not authenticated.
+    if (!isAuthDataLoaded) {
       return [];
     }
     
-    // Primary filter: Only show content for the currently selected filterCategory (i.e., the active course)
     let filtered = contentList.filter(item => item.category === filterCategory);
 
-    // Apply module filter if set (e.g., 'Listening', 'Reading')
     if (filterModule !== 'All') {
       filtered = filtered.filter(item => item.module === filterModule);
     }
 
-    // Apply day filter based on selected category and module
     if (filterDay !== 'All') {
       filtered = filtered.filter(item => item.day === filterDay);
     }
@@ -866,7 +1185,7 @@ const App = () => {
   const getModuleOptions = (category) => {
     switch (category) {
         case 'IELTS':
-            return ['All', 'Reading', 'Writing', 'Speaking', 'Listening'];
+            return ['All', 'Listening', 'Reading', 'Writing', 'Speaking']; // Reordered for better UI flow
         case 'PT':
             return ['All', 'Speaking', 'Writing', 'Reading', 'Listening'];
         case 'SAT':
@@ -876,14 +1195,12 @@ const App = () => {
     }
   };
 
-  // This function is used for both display filtering and the admin form's dropdowns.
-  // It uses `filterCategory` and `filterModule` for display, and `newVideoCategory`/`newVideoModule` for admin form.
-  const getDayOptions = () => {
-    const currentCategory = appState === 'add_video' ? newVideoCategory : filterCategory;
-    const currentModule = appState === 'add_video' ? newVideoModule : filterModule;
+  const getDayOptions = (currentCategory, currentModule) => {
+    const category = currentCategory || filterCategory;
+    const module = currentModule || filterModule;
 
-    if (currentCategory === 'IELTS') {
-      switch (currentModule) {
+    if (category === 'IELTS') {
+      switch (module) {
         case 'Listening':
           return ['All', 'Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7', 'Day 8'];
         case 'Reading':
@@ -893,8 +1210,8 @@ const App = () => {
         default:
           return ['All'];
       }
-    } else if (currentCategory === 'PT') {
-      switch (currentModule) {
+    } else if (category === 'PT') {
+      switch (module) {
         case 'Speaking':
         case 'Writing':
         case 'Reading':
@@ -903,8 +1220,8 @@ const App = () => {
         default:
           return ['All'];
       }
-    } else if (currentCategory === 'SAT') {
-      switch (currentModule) {
+    } else if (category === 'SAT') {
+      switch (module) {
         case 'Math':
         case 'Reading':
         case 'Writing':
@@ -919,28 +1236,25 @@ const App = () => {
 
   // Calculate upcoming expirations
   const upcomingExpirations = registeredExams.filter(exam => {
-    // Ensure exam.expiration exists and is a valid date string BEFORE parsing
-    if (!exam.expiration || isNaN(Date.parse(exam.expiration))) {
-      console.warn("Skipping invalid expiration date for reminder:", exam.name, exam.expiration); // Debug log
-      return false; // Skip if expiration is missing or invalid
+    if (!exam.expiration || isNaN(new Date(exam.expiration).getTime())) { // Use getTime() to check for valid date
+      console.warn("Skipping invalid expiration date for reminder:", exam.name, exam.expiration);
+      return false; 
     }
     const expirationDate = new Date(exam.expiration);
     const today = new Date();
-    // Set today's time to 00:00:00 to compare full days
     today.setHours(0, 0, 0, 0); 
-    expirationDate.setHours(0, 0, 0, 0); // Also set expiration to start of day for consistent comparison
+    expirationDate.setHours(0, 0, 0, 0); 
 
     const diffTime = expirationDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    console.log(`Exam: ${exam.name}, Expiration: ${exam.expiration}, Current Date: ${new Date().toISOString()}, DiffDays: ${diffDays}`); // Debug log
-    return diffDays > 0 && diffDays <= 30; // Within the next 30 days, and not already expired
+    console.log(`Exam: ${exam.name}, Expiration: ${exam.expiration}, Current Date: ${new Date().toISOString()}, DiffDays: ${diffDays}`);
+    return diffDays > 0 && diffDays <= 30; 
   }).sort((a, b) => {
     const dateA = new Date(a.expiration);
     const dateB = new Date(b.expiration);
-    // Handle invalid dates during sorting as well, push them to the end or just compare valid ones
-    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0; // Both invalid, treat as equal for sorting
-    if (isNaN(dateA.getTime())) return 1; // A is invalid, push to end
-    if (isNaN(dateB.getTime())) return -1; // B is invalid, push to end
+    if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0; 
+    if (isNaN(dateA.getTime())) return 1; 
+    if (isNaN(dateB.getTime())) return -1; 
     return dateA.getTime() - dateB.getTime();
   });
 
@@ -948,8 +1262,7 @@ const App = () => {
   const filteredVideos = applyContentFilters(videos);
   const filteredQuizzes = applyContentFilters(quizzes);
   const filteredAssignments = applyContentFilters(assignments);
-  const filteredWorksheets = applyContentFilters(worksheets); // Filter worksheets
-
+  const filteredWorksheets = applyContentFilters(worksheets); 
 
   // Ensure dynamic resizing of main content area (using Tailwind-like media queries via inline styles)
   useEffect(() => {
@@ -961,48 +1274,29 @@ const App = () => {
         return;
       }
 
-      if (window.innerWidth >= 1024) { // Equivalent to lg:flex-row
+      if (window.innerWidth >= 1024) { 
         mainElement.style.flexDirection = 'row';
-        contentGridElements.forEach(el => el.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))'); // lg:grid-cols-3
-      } else if (window.innerWidth >= 768) { // Equivalent to md:flex-col, md:grid-cols-2
-        mainElement.style.flexDirection = 'column'; // Keep sidebar and content stacked as columns
+        contentGridElements.forEach(el => el.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))'); 
+      } else if (window.innerWidth >= 768) { 
+        mainElement.style.flexDirection = 'column'; 
         contentGridElements.forEach(el => el.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))');
-      } else { // Mobile: flex-col, grid-cols-1
+      } else { 
         mainElement.style.flexDirection = 'column';
         contentGridElements.forEach(el => el.style.gridTemplateColumns = 'repeat(1, minmax(0, 1fr))');
       }
     };
 
     window.addEventListener('resize', handleResize);
-    handleResize(); // Call once on mount
+    handleResize(); 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Temporary function to toggle admin status for testing
-  const toggleAdminStatus = async () => {
-    if (!db || !userId || !userProfilesCollectionPathRef.current) {
-        setMessage('Cannot toggle admin status: Firebase or user not ready.');
-        return;
-    }
-    const userProfileDocRef = doc(db, userProfilesCollectionPathRef.current, userId);
-    try {
-        console.log("Toggling admin status for user:", userId, "Current isAdmin:", isAdmin);
-        await setDoc(userProfileDocRef, { isAdmin: !isAdmin }, { merge: true });
-        setIsAdmin(prev => !prev);
-        setMessage(`Admin status toggled to: ${!isAdmin}`);
-        console.log("Admin status successfully toggled.");
-    } catch (error) {
-        console.error("Error toggling admin status:", error);
-        setMessage(`Error toggling admin status: ${error.message}`);
-    }
-  };
-
-
-  if (appState === 'loading') {
+  // Render a loading state until authentication data is fully loaded
+  if (!isAuthDataLoaded) {
     return (
-      <div style={styles.loadingContainer}>
+      <div style={styles.fullScreenCenter}>
         <div style={styles.loadingMessage}>
-          Loading Firebase and authenticating...
+          Loading and authenticating...
         </div>
       </div>
     );
@@ -1053,7 +1347,7 @@ const App = () => {
               </button>
             )}
             <button
-              onClick={() => { setIsLoginView(!isLoginView); setMessage(''); }} // Clear message on toggle
+              onClick={() => { setIsLoginView(!isLoginView); setMessage(''); }} 
               style={styles.toggleAuthViewButton}
             >
               {isLoginView ? 'New user? Register here' : 'Already have an account? Login'}
@@ -1107,7 +1401,7 @@ const App = () => {
     );
   }
 
-  // --- Manually Add Video Screen (Admin Only) ---
+  // --- Admin Add Video Screen ---
   if (appState === 'add_video') {
     if (!isAdmin) {
         return (
@@ -1124,36 +1418,48 @@ const App = () => {
     }
     return (
       <div style={styles.fullScreenCenter}>
-        <div style={styles.authCard}> {/* Reusing authCard style for a consistent look */}
-          <h2 style={styles.authTitle}>Add New Video</h2>
+        <div style={styles.adminFormCard}> 
+          <h2 style={styles.adminFormTitle}>Add New Video</h2>
           <input
             type="text"
             placeholder="Video Title"
             value={newVideoTitle}
             onChange={(e) => setNewVideoTitle(e.target.value)}
-            style={styles.authInput}
+            style={styles.adminFormInput}
           />
           <textarea
             placeholder="Video Description"
             value={newVideoDescription}
             onChange={(e) => setNewVideoDescription(e.target.value)}
-            style={{ ...styles.authInput, height: '80px', resize: 'vertical' }}
+            style={{ ...styles.adminFormInput, height: '80px', resize: 'vertical' }}
           />
           <input
             type="text"
             placeholder="Video URL (e.g., https://example.com/video.mp4)"
             value={newVideoUrl}
-            onChange={(e) => setNewVideoUrl(e.target.value)}
-            style={styles.authInput}
+            onChange={(e) => {setNewVideoUrl(e.target.value); setNewVideoFile(null); }} // Clear file if URL is typed
+            style={styles.adminFormInput}
           />
+          <div style={styles.fileUploadContainer}>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={(e) => {setNewVideoFile(e.target.files[0]); setNewVideoUrl(''); }} // Clear URL if file is selected
+              style={styles.fileInput}
+            />
+            <span style={styles.fileInputLabel}>
+                {newVideoFile ? newVideoFile.name : 'Or choose a video file to upload'}
+            </span>
+          </div>
+
           <select
             value={newVideoCategory}
             onChange={(e) => {
               setNewVideoCategory(e.target.value);
-              setNewVideoModule('All'); // Reset module when category changes
-              setNewVideoDay('All'); // Reset day when category changes
+              setNewVideoModule('All'); 
+              setNewVideoDay('All'); 
             }}
-            style={styles.authInput}
+            style={styles.adminFormInput}
           >
             <option value="IELTS">IELTS</option>
             <option value="PT">PT</option>
@@ -1163,9 +1469,9 @@ const App = () => {
             value={newVideoModule}
             onChange={(e) => {
               setNewVideoModule(e.target.value);
-              setNewVideoDay('All'); // Reset day when module changes
+              setNewVideoDay('All'); 
             }}
-            style={styles.authInput}
+            style={styles.adminFormInput}
           >
             {getModuleOptions(newVideoCategory).map(module => (
                 <option key={module} value={module}>{module}</option>
@@ -1174,18 +1480,265 @@ const App = () => {
           <select
             value={newVideoDay}
             onChange={(e) => setNewVideoDay(e.target.value)}
-            style={styles.authInput}
+            style={styles.adminFormInput}
           >
-            {getDayOptions().map(day => ( // Pass category and module
+            {getDayOptions(newVideoCategory, newVideoModule).map(day => ( 
                 <option key={day} value={day}>{day}</option>
             ))}
           </select>
 
-          <button onClick={handleAddVideo} style={styles.authButton}>
+          <button onClick={handleAddVideo} style={styles.adminFormButton} disabled={!isAdmin || !isSupabaseClientReady}>
             Add Video
           </button>
-          <button onClick={() => setAppState('dashboard')} style={styles.toggleAuthViewButton}>
-            ← Back to Dashboard
+          <button onClick={() => setAppState('admin_dashboard')} style={styles.adminFormBackButton}>
+            ← Back to Admin Dashboard
+          </button>
+          {message && (
+            <p style={message.includes('Error') ? styles.errorMessage : styles.successMessage}>
+              {message}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Admin Add Quiz Screen ---
+  if (appState === 'add_quiz') {
+    if (!isAdmin) {
+      return (
+        <div style={styles.fullScreenCenter}>
+          <div style={styles.authCard}>
+            <h2 style={styles.authTitle}>Access Denied</h2>
+            <p style={styles.authText}>You do not have administrative privileges to add quizzes.</p>
+            <button onClick={() => setAppState('dashboard')} style={styles.authButton}>
+              ← Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={styles.fullScreenCenter}>
+        <div style={styles.adminFormCard}>
+          <h2 style={styles.adminFormTitle}>Add New Quiz</h2>
+          <input
+            type="text"
+            placeholder="Quiz Title"
+            value={newQuizTitle}
+            onChange={(e) => setNewQuizTitle(e.target.value)}
+            style={styles.adminFormInput}
+          />
+          <textarea
+            placeholder="Quiz Description"
+            value={newQuizDescription}
+            onChange={(e) => setNewQuizDescription(e.target.value)}
+            style={{ ...styles.adminFormInput, height: '80px', resize: 'vertical' }}
+          />
+          <select
+            value={newQuizCategory}
+            onChange={(e) => {
+              setNewQuizCategory(e.target.value);
+              setNewQuizModule('All');
+              setNewQuizDay('All');
+            }}
+            style={styles.adminFormInput}
+          >
+            <option value="IELTS">IELTS</option>
+            <option value="PT">PT</option>
+            <option value="SAT">SAT</option>
+          </select>
+          <select
+            value={newQuizModule}
+            onChange={(e) => {
+              setNewQuizModule(e.target.value);
+              setNewQuizDay('All');
+            }}
+            style={styles.adminFormInput}
+          >
+            {getModuleOptions(newQuizCategory).map(module => (
+              <option key={module} value={module}>{module}</option>
+            ))}
+          </select>
+          <select
+            value={newQuizDay}
+            onChange={(e) => setNewQuizDay(e.target.value)}
+            style={styles.adminFormInput}
+          >
+            {getDayOptions(newQuizCategory, newQuizModule).map(day => (
+              <option key={day} value={day}>{day}</option>
+            ))}
+          </select>
+
+          <h3 style={styles.adminFormSubtitle}>Questions:</h3>
+          {newQuizQuestions.map((q, qIndex) => (
+            <div key={qIndex} style={styles.questionBlock}>
+              <input
+                type="text"
+                placeholder={`Question ${qIndex + 1} Text`}
+                value={q.questionText}
+                onChange={(e) => handleQuestionChange(qIndex, 'questionText', e.target.value)}
+                style={styles.adminFormInput}
+              />
+              <p style={styles.questionOptionsLabel}>Options:</p>
+              {q.options.map((option, oIndex) => (
+                <input
+                  key={oIndex}
+                  type="text"
+                  placeholder={`Option ${oIndex + 1}`}
+                  value={option}
+                  onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)}
+                  style={styles.adminFormInput}
+                />
+              ))}
+              <input
+                type="text"
+                placeholder="Correct Answer (must match one of the options)"
+                value={q.correctAnswer}
+                onChange={(e) => handleQuestionChange(qIndex, 'correctAnswer', e.target.value)}
+                style={styles.adminFormInput}
+              />
+              <button onClick={() => removeQuestion(qIndex)} style={styles.removeQuestionButton}>
+                Remove Question
+              </button>
+            </div>
+          ))}
+          <button onClick={addQuestion} style={styles.addQuestionButton}>
+            Add Question
+          </button>
+
+          <button onClick={handleAddQuiz} style={styles.adminFormButton} disabled={!isAdmin || !isSupabaseClientReady}>
+            Add Quiz
+          </button>
+          <button onClick={() => setAppState('admin_dashboard')} style={styles.adminFormBackButton}>
+            ← Back to Admin Dashboard
+          </button>
+          {message && (
+            <p style={message.includes('Error') ? styles.errorMessage : styles.successMessage}>
+              {message}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Admin Add Assignment Screen ---
+  if (appState === 'add_assignment') {
+    if (!isAdmin) {
+      return (
+        <div style={styles.fullScreenCenter}>
+          <div style={styles.authCard}>
+            <h2 style={styles.authTitle}>Access Denied</h2>
+                            <p style={styles.authText}>You do not have administrative privileges to add assignments.</p>
+            <button onClick={() => setAppState('dashboard')} style={styles.authButton}>
+              ← Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={styles.fullScreenCenter}>
+        <div style={styles.adminFormCard}>
+          <h2 style={styles.adminFormTitle}>Add New Assignment</h2>
+          <input
+            type="text"
+            placeholder="Assignment Title"
+            value={newAssignmentTitle}
+            onChange={(e) => setNewAssignmentTitle(e.target.value)}
+            style={styles.adminFormInput}
+          />
+          <textarea
+            placeholder="Assignment Description"
+            value={newAssignmentDescription}
+            onChange={(e) => setNewAssignmentDescription(e.target.value)}
+            style={{ ...styles.adminFormInput, height: '80px', resize: 'vertical' }}
+          />
+          <select
+            value={newAssignmentCategory}
+            onChange={(e) => {
+              setNewAssignmentCategory(e.target.value);
+              setNewAssignmentModule('All');
+              setNewAssignmentDay('All');
+            }}
+            style={styles.adminFormInput}
+          >
+            <option value="IELTS">IELTS</option>
+            <option value="PT">PT</option>
+            <option value="SAT">SAT</option>
+          </select>
+          <select
+            value={newAssignmentModule}
+            onChange={(e) => {
+              setNewAssignmentModule(e.target.value);
+              setNewAssignmentDay('All');
+            }}
+            style={styles.adminFormInput}
+          >
+            {getModuleOptions(newAssignmentCategory).map(module => (
+              <option key={module} value={module}>{module}</option>
+            ))}
+          </select>
+          <select
+            value={newAssignmentDay}
+            onChange={(e) => setNewAssignmentDay(e.target.value)}
+            style={styles.adminFormInput}
+          >
+            {getDayOptions(newAssignmentCategory, newAssignmentModule).map(day => (
+              <option key={day} value={day}>{day}</option>
+            ))}
+          </select>
+
+          <button onClick={handleAddAssignment} style={styles.adminFormButton} disabled={!isAdmin || !isSupabaseClientReady}>
+            Add Assignment
+          </button>
+          <button onClick={() => setAppState('admin_dashboard')} style={styles.adminFormBackButton}>
+            ← Back to Admin Dashboard
+          </button>
+          {message && (
+            <p style={message.includes('Error') ? styles.errorMessage : styles.successMessage}>
+              {message}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- Admin Dashboard (New State) ---
+  if (appState === 'admin_dashboard') {
+    if (!isAdmin) {
+      return (
+        <div style={styles.fullScreenCenter}>
+          <div style={styles.authCard}>
+            <h2 style={styles.authTitle}>Access Denied</h2>
+            <p style={styles.authText}>You do not have administrative privileges to access this page.</p>
+            <button onClick={() => setAppState('dashboard')} style={styles.authButton}>
+              ← Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={styles.fullScreenCenter}>
+        <div style={styles.adminFormCard}>
+          <h2 style={styles.adminFormTitle}>Admin Dashboard</h2>
+          <p style={styles.adminFormText}>Welcome, Administrator {userName}!</p>
+          <div style={styles.adminDashboardButtons}>
+            <button onClick={() => setAppState('add_video')} style={styles.adminDashboardButton}>
+              Add New Video
+            </button>
+            <button onClick={() => setAppState('add_quiz')} style={styles.adminDashboardButton}>
+              Add New Quiz
+            </button>
+            <button onClick={() => setAppState('add_assignment')} style={styles.adminDashboardButton}>
+              Add New Assignment
+            </button>
+          </div>
+          <button onClick={() => setAppState('dashboard')} style={styles.adminFormBackButton}>
+            ← Back to User Dashboard
           </button>
           {message && (
             <p style={message.includes('Error') ? styles.errorMessage : styles.successMessage}>
@@ -1220,16 +1773,14 @@ const App = () => {
 
       {/* Header */}
       <header style={styles.header}>
-        <h1 style={styles.headerTitle}>StudyPrep!</h1> {/* Updated title */}
+        <h1 style={styles.headerTitle}>StudyPrep!</h1> 
         <div style={styles.headerRight}>
           <div style={styles.userIdDisplay}>
-            Welcome, {userName || 'Guest'}! {isAdmin && '(Admin)'} {/* Show user name and admin status */}
+            Welcome, {userName || 'Guest'}! {isAdmin && '(Admin)'} 
           </div>
-          {userId && ( // Only show if a user is logged in
-            <button onClick={toggleAdminStatus} style={styles.changePasswordButton}>
-              Toggle Admin Status
-            </button>
-          )}
+          {/* Debugging log for isAdmin status */}
+          {console.log("Rendering header. isAdmin is:", isAdmin)}
+          {/* Removed Admin Toggle button */}
           <button onClick={() => setShowChangePasswordModal(true)} style={styles.changePasswordButton}>
             Change Password
           </button>
@@ -1259,7 +1810,7 @@ const App = () => {
                     <nav style={styles.navContainer}>
                         {registeredExams.map(exam => (
                             <button
-                                key={exam.name} // Use exam.name for key
+                                key={exam.name} 
                                 onClick={() => goToCourseHome(exam.name)}
                                 style={filterCategory === exam.name ? styles.navButtonSelected : styles.navButton}
                             >
@@ -1290,11 +1841,11 @@ const App = () => {
           )}
 
           {/* Dynamic Day Filter (based on selected Course/filterCategory and Module) */}
-          {filterCategory !== 'All' && filterModule !== 'All' && getDayOptions().length > 1 && ( // Only show if there are actual days beyond 'All'
+          {filterCategory !== 'All' && filterModule !== 'All' && getDayOptions(filterCategory, filterModule).length > 1 && ( 
             <div style={styles.filterSection}>
               <h3 style={styles.filterTitle}>{filterModule} Days</h3>
               <div style={styles.filterButtonsContainer}>
-                {getDayOptions().map(day => (
+                {getDayOptions(filterCategory, filterModule).map(day => (
                   <button
                     key={day}
                     onClick={() => setFilterDay(day)}
@@ -1307,14 +1858,14 @@ const App = () => {
             </div>
           )}
 
-          {/* Add Video Button (Admin Only) */}
+          {/* Admin Management Button (Admin Only) */}
           {isAdmin && (
             <div style={styles.manageExamsContainer}>
               <button
-                onClick={() => setAppState('add_video')}
+                onClick={() => setAppState('admin_dashboard')} // Navigate to new Admin Dashboard
                 style={styles.manageExamsButton}
               >
-                Add New Video
+                Admin Management
               </button>
             </div>
           )}
@@ -1357,7 +1908,6 @@ const App = () => {
                       <ul style={styles.expirationReminderList}>
                         {upcomingExpirations.map(exam => {
                           const expirationDate = new Date(exam.expiration);
-                          // No need to recalculate diffDays here, already done in upcomingExpirations filter/sort
                           const diffDays = Math.ceil((expirationDate.getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
                           return (
                             <li key={exam.name} style={styles.expirationReminderItem}>
@@ -1533,7 +2083,7 @@ const App = () => {
                       <p style={styles.noContentMessage}>No quizzes available for this selection.</p>
                     )
                   )}
-                  {contentTab === 'worksheets' && ( // Display worksheets
+                  {contentTab === 'worksheets' && ( 
                     filteredWorksheets.length > 0 ? (
                       filteredWorksheets.map(worksheet => (
                         <a key={worksheet.id} href={worksheet.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
@@ -1590,14 +2140,14 @@ const App = () => {
               placeholder="Current Password (for verification)"
               value={currentPasswordForReauth}
               onChange={(e) => setCurrentPasswordForReauth(e.target.value)}
-              style={styles.authInput} // Reusing authInput style
+              style={styles.authInput} 
             />
             <input
               type="password"
               placeholder="New Password (min 6 characters)"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              style={styles.authInput} // Reusing authInput style
+              style={styles.authInput} 
             />
             <div style={styles.modalButtonsContainer}>
               <button
@@ -1611,7 +2161,7 @@ const App = () => {
                 style={styles.modalConfirmButton}
               >
                 Change Password
-  </button>
+              </button>
             </div>
             {message && (
               <p style={message.includes('Error') ? styles.errorMessage : styles.successMessage}>
@@ -1652,6 +2202,16 @@ const styles = {
     backgroundColor: '#fff',
     animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
   },
+  fullScreenCenter: {
+    minHeight: '100vh',
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    fontFamily: 'Inter',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '1rem',
+  },
   header: {
     background: 'linear-gradient(to right, #2563eb, #4f46e5)',
     color: '#fff',
@@ -1661,27 +2221,27 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     borderRadius: '0 0 0.5rem 0.5rem',
-    flexWrap: 'wrap', // Allow wrapping on small screens
+    flexWrap: 'wrap', 
   },
   headerTitle: {
     fontSize: '1.875rem',
     fontWeight: 'bold',
     margin: 0,
-    paddingRight: '1rem', // Add some space for wrapping
+    paddingRight: '1rem', 
   },
   headerRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem', // Slightly reduced gap for mobile
-    flexWrap: 'wrap', // Allow buttons to wrap
-    justifyContent: 'flex-end', // Align buttons to end
-    marginTop: '0.5rem', // Add top margin when wrapped
+    gap: '0.75rem', 
+    flexWrap: 'wrap', 
+    justifyContent: 'flex-end', 
+    marginTop: '0.5rem', 
   },
   userIdDisplay: {
     fontSize: '0.875rem',
     fontWeight: '500',
-    flexBasis: '100%', // Take full width on small screens
-    textAlign: 'right', // Align to right
+    flexBasis: '100%', 
+    textAlign: 'right', 
     marginBottom: '0.5rem',
   },
   logoutButton: {
@@ -1693,7 +2253,7 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     fontWeight: '500',
-    minWidth: 'fit-content', // Prevent shrinking
+    minWidth: 'fit-content', 
   },
   changePasswordButton: { 
     padding: '0.5rem 1rem',
@@ -1710,11 +2270,11 @@ const styles = {
     flex: 1,
     padding: '1rem',
     display: 'flex',
-    flexDirection: 'column', // Default to column for mobile
-    gap: '1.5rem', // Slightly reduced gap for mobile
+    flexDirection: 'column', 
+    gap: '1.5rem', 
   },
   sidebar: {
-    width: '100%', // Full width on mobile
+    width: '100%', 
     backgroundColor: '#fff',
     padding: '1.5rem',
     borderRadius: '0.75rem',
@@ -1736,7 +2296,7 @@ const styles = {
   navButton: {
     padding: '0.75rem 1rem',
     borderRadius: '0.5rem',
-    fontSize: '1rem', // Slightly smaller font for mobile
+    fontSize: '1rem', 
     fontWeight: '500',
     transition: 'all 0.3s ease',
     backgroundColor: '#e5e7eb',
@@ -1744,12 +2304,12 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     textAlign: 'left',
-    width: '100%', // Full width buttons
+    width: '100%', 
   },
   navButtonSelected: {
     padding: '0.75rem 1rem',
     borderRadius: '0.5rem',
-    fontSize: '1rem', // Slightly smaller font for mobile
+    fontSize: '1rem', 
     fontWeight: '500',
     transition: 'all 0.3s ease',
     backgroundColor: '#3b82f6',
@@ -1758,13 +2318,13 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     textAlign: 'left',
-    width: '100%', // Full width buttons
+    width: '100%', 
   },
   filterSection: {
     marginTop: '1.5rem',
   },
   filterTitle: {
-    fontSize: '1.125rem', // Slightly smaller font for mobile
+    fontSize: '1.125rem', 
     fontWeight: '600',
     marginBottom: '0.75rem',
     color: '#374151',
@@ -1775,9 +2335,9 @@ const styles = {
     gap: '0.5rem',
   },
   filterButton: {
-    padding: '0.4rem 0.8rem', // Smaller padding
+    padding: '0.4rem 0.8rem', 
     borderRadius: '9999px',
-    fontSize: '0.75rem', // Smaller font
+    fontSize: '0.75rem', 
     fontWeight: '500',
     transition: 'all 0.3s ease',
     backgroundColor: '#e5e7eb',
@@ -1786,9 +2346,9 @@ const styles = {
     cursor: 'pointer',
   },
   filterButtonSelected: {
-    padding: '0.4rem 0.8rem', // Smaller padding
+    padding: '0.4rem 0.8rem', 
     borderRadius: '9999px',
-    fontSize: '0.75rem', // Smaller font
+    fontSize: '0.75rem', 
     fontWeight: '500',
     transition: 'all 0.3s ease',
     backgroundColor: '#6366f1',
@@ -1830,7 +2390,7 @@ const styles = {
     backgroundColor: '#fee2e2',
     color: '#b91c1c',
   },
-  messageSuccess: {
+  successMessage: {
     padding: '0.75rem',
     marginBottom: '1rem',
     borderRadius: '0.5rem',
@@ -1869,8 +2429,8 @@ const styles = {
     color: '#2563eb',
   },
   expirationReminderBox: {
-    backgroundColor: '#fffbe0', // Light yellow background
-    border: '1px solid #fde047', // Yellow border
+    backgroundColor: '#fffbe0', 
+    border: '1px solid #fde047', 
     borderRadius: '0.5rem',
     padding: '1rem',
     marginBottom: '1.5rem',
@@ -1879,7 +2439,7 @@ const styles = {
   expirationReminderTitle: {
     fontSize: '1.25rem',
     fontWeight: '600',
-    color: '#b45309', // Dark orange text
+    color: '#b45309', 
     marginBottom: '0.75rem',
     textAlign: 'center',
   },
@@ -1891,16 +2451,16 @@ const styles = {
   },
   expirationReminderItem: {
     fontSize: '1rem',
-    color: '#713f12', // Brownish text
+    color: '#713f12', 
     marginBottom: '0.5rem',
   },
   expirationCourseName: {
     fontWeight: 'bold',
-    color: '#d97706', // Orange
+    color: '#d97706', 
   },
   expirationDays: {
     fontWeight: 'bold',
-    color: '#dc2626', // Red for urgency
+    color: '#dc2626', 
   },
   expirationCallToAction: {
     fontSize: '0.9rem',
@@ -1996,7 +2556,7 @@ const styles = {
   quizTitle: {
     fontSize: '1.25rem',
     fontWeight: 'bold',
-    marginBottom: '1rem',
+    marginBottom: '1.rem',
     color: '#1d4ed8',
   },
   questionProgress: {
@@ -2163,16 +2723,6 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
   },
-  fullScreenCenter: {
-    minHeight: '100vh',
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    fontFamily: 'Inter',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '1rem',
-  },
   authCard: {
     backgroundColor: '#fff',
     padding: '2rem',
@@ -2265,7 +2815,7 @@ const styles = {
     justifyContent: 'center',
     gap: '1rem',
     marginBottom: '2rem',
-    flexWrap: 'wrap', // Allow wrapping of exam buttons
+    flexWrap: 'wrap', 
   },
   examButton: {
     padding: '0.75rem 1.5rem',
@@ -2319,11 +2869,11 @@ const styles = {
     justifyContent: 'center',
     marginBottom: '1.5rem',
     borderBottom: '2px solid #e5e7eb',
-    flexWrap: 'wrap', // Allow tabs to wrap on small screens
+    flexWrap: 'wrap', 
   },
   contentTab: {
     padding: '0.75rem 1.5rem',
-    fontSize: '1rem', // Smaller font for mobile
+    fontSize: '1rem', 
     fontWeight: '500',
     backgroundColor: 'transparent',
     border: 'none',
@@ -2334,7 +2884,7 @@ const styles = {
   },
   contentTabSelected: {
     padding: '0.75rem 1.5rem',
-    fontSize: '1rem', // Smaller font for mobile
+    fontSize: '1rem', 
     fontWeight: '600',
     backgroundColor: 'transparent',
     border: 'none',
@@ -2342,6 +2892,146 @@ const styles = {
     color: '#3b82f6',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
+  },
+  adminFormCard: {
+    backgroundColor: '#fff',
+    padding: '2rem',
+    borderRadius: '0.75rem',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    border: '1px solid #e5e7eb',
+    maxWidth: '40rem', // Wider for forms
+    width: '100%',
+    textAlign: 'center',
+  },
+  adminFormTitle: {
+    fontSize: '1.875rem',
+    fontWeight: 'bold',
+    marginBottom: '1.5rem',
+    color: '#1d4ed8',
+  },
+  adminFormSubtitle: {
+    fontSize: '1.25rem',
+    fontWeight: '600',
+    marginTop: '1.5rem',
+    marginBottom: '1rem',
+    color: '#4b5563',
+    textAlign: 'left',
+  },
+  adminFormText: {
+    color: '#4b5563',
+    marginBottom: '1.5rem',
+  },
+  adminFormInput: {
+    width: 'calc(100% - 2rem)', // Account for padding
+    padding: '0.75rem',
+    marginBottom: '1rem',
+    border: '1px solid #d1d5db',
+    borderRadius: '0.375rem',
+    fontSize: '1rem',
+    display: 'block', // Ensure it takes full width
+    marginLeft: 'auto',
+    marginRight: 'auto',
+  },
+  fileUploadContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.5rem',
+    marginBottom: '1rem',
+    padding: '0.75rem',
+    border: '1px dashed #9ca3af',
+    borderRadius: '0.375rem',
+    backgroundColor: '#f9fafb',
+    cursor: 'pointer',
+  },
+  fileInput: {
+    display: 'none', // Hide default file input
+  },
+  fileInputLabel: {
+    backgroundColor: '#6366f1',
+    color: '#fff',
+    padding: '0.5rem 1rem',
+    borderRadius: '0.375rem',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+  },
+  adminFormButton: {
+    padding: '0.75rem 1.5rem',
+    borderRadius: '0.5rem',
+    fontSize: '1.125rem',
+    fontWeight: 'bold',
+    backgroundColor: '#22c55e',
+    color: '#fff',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s ease',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    marginTop: '1rem',
+    width: '100%',
+  },
+  adminFormBackButton: {
+    padding: '0.5rem 1rem',
+    backgroundColor: 'transparent',
+    color: '#2563eb',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    marginTop: '1rem',
+  },
+  questionBlock: {
+    border: '1px solid #e5e7eb',
+    borderRadius: '0.5rem',
+    padding: '1rem',
+    marginBottom: '1rem',
+    backgroundColor: '#f9fafb',
+  },
+  questionOptionsLabel: {
+    textAlign: 'left',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    marginBottom: '0.5rem',
+    color: '#4b5563',
+  },
+  removeQuestionButton: {
+    backgroundColor: '#ef4444',
+    color: '#fff',
+    padding: '0.5rem 1rem',
+    borderRadius: '0.5rem',
+    border: 'none',
+    cursor: 'pointer',
+    marginTop: '0.5rem',
+    fontSize: '0.9rem',
+  },
+  addQuestionButton: {
+    backgroundColor: '#3b82f6',
+    color: '#fff',
+    padding: '0.75rem 1.5rem',
+    borderRadius: '0.5rem',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    marginTop: '1rem',
+  },
+  adminDashboardButtons: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+    marginTop: '1.5rem',
+  },
+  adminDashboardButton: {
+    padding: '1rem 1.5rem',
+    borderRadius: '0.5rem',
+    fontSize: '1.25rem',
+    fontWeight: 'bold',
+    backgroundColor: '#3b82f6',
+    color: '#fff',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s ease',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
   },
 };
 
