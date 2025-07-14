@@ -487,13 +487,25 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
     const [newLessonType, setNewLessonType] = useState('text');
     const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
     const [newLessonDocumentUrl, setNewLessonDocumentUrl] = useState('');
+    const [newLessonVideoFile, setNewLessonVideoFile] = useState(null); // State for video file upload
+    const [newLessonDocumentFile, setNewLessonDocumentFile] = useState(null); // State for document file upload
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
 
     const handleCreateLesson = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setMessage('');
+        setMessage('Adding lesson...'); // Provide immediate feedback
+        console.log('LessonCreationForm: Attempting to create lesson for module:', moduleId);
+        console.log('LessonCreationForm: Lesson data:', {
+            title: newLessonTitle,
+            content: newLessonContent,
+            type: newLessonType,
+            video_url: newLessonVideoUrl,
+            document_url: newLessonDocumentUrl,
+            video_file: newLessonVideoFile ? newLessonVideoFile.name : 'none',
+            document_file: newLessonDocumentFile ? newLessonDocumentFile.name : 'none',
+        });
 
         if (!newLessonTitle || !newLessonContent) {
             setMessage('Please fill lesson title and content.');
@@ -501,41 +513,82 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             return;
         }
 
-        let videoUrlToSave = null;
-        let documentUrlToSave = null;
+        let finalVideoUrl = newLessonVideoUrl;
+        let finalDocumentUrl = newLessonDocumentUrl;
 
-        if (newLessonType === 'video' && newLessonVideoUrl) {
-            videoUrlToSave = newLessonVideoUrl;
-        } else if (newLessonType === 'document' && newLessonDocumentUrl) {
-            documentUrlToSave = newLessonDocumentUrl;
+        try {
+            // Handle video file upload if provided
+            if (newLessonType === 'video' && newLessonVideoFile) {
+                setMessage('Uploading video file...');
+                const videoFilePath = `${moduleId}/videos/${Date.now()}-${newLessonVideoFile.name}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('course-videos')
+                    .upload(videoFilePath, newLessonVideoFile);
+
+                if (uploadError) {
+                    console.error('LessonCreationForm: Error uploading video file:', uploadError);
+                    setMessage(`Error uploading video: ${uploadError.message}`);
+                    setLoading(false);
+                    return;
+                }
+                finalVideoUrl = supabase.storage.from('course-videos').getPublicUrl(uploadData.path).data.publicUrl;
+                console.log('LessonCreationForm: Video file uploaded. Public URL:', finalVideoUrl);
+            }
+
+            // Handle document file upload if provided
+            if (newLessonType === 'document' && newLessonDocumentFile) {
+                setMessage('Uploading document file...');
+                const documentFilePath = `${moduleId}/documents/${Date.now()}-${newLessonDocumentFile.name}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('course-documents')
+                    .upload(documentFilePath, newLessonDocumentFile);
+
+                if (uploadError) {
+                    console.error('LessonCreationForm: Error uploading document file:', uploadError);
+                    setMessage(`Error uploading document: ${uploadError.message}`);
+                    setLoading(false);
+                    return;
+                }
+                finalDocumentUrl = supabase.storage.from('course-documents').getPublicUrl(uploadData.path).data.publicUrl;
+                console.log('LessonCreationForm: Document file uploaded. Public URL:', finalDocumentUrl);
+            }
+
+            console.log('LessonCreationForm: Calling Supabase insert for lessons table with final URLs...');
+            const { data, error } = await supabase.from('lessons').insert([
+                {
+                    module_id: moduleId,
+                    title: newLessonTitle,
+                    content: newLessonContent,
+                    type: newLessonType,
+                    video_url: finalVideoUrl,
+                    document_url: finalDocumentUrl,
+                    order: 0, // Simplified ordering
+                },
+            ]).select(); // Added .select() to get the inserted data back
+            console.log('LessonCreationForm: Supabase insert result - data:', data, 'error:', error);
+
+            if (error) {
+                console.error('LessonCreationForm: Error creating lesson (details):', error.message || JSON.stringify(error));
+                setMessage(`Error creating lesson: ${error.message || 'Unknown error. Check console.'}`);
+            } else {
+                setMessage('Lesson created successfully!');
+                setNewLessonTitle('');
+                setNewLessonContent('');
+                setNewLessonType('text');
+                setNewLessonVideoUrl('');
+                setNewLessonDocumentUrl('');
+                setNewLessonVideoFile(null); // Clear file input state
+                setNewLessonDocumentFile(null); // Clear file input state
+                onLessonCreate(data[0]); // Pass the new lesson back to parent
+                fetchCourseDetails(); // Trigger a re-fetch of course details in AdminDashboard
+            }
+        } catch (insertError) {
+            console.error('LessonCreationForm: Unexpected error during lesson insert/upload:', insertError);
+            setMessage(`An unexpected error occurred: ${insertError.message}`);
+        } finally {
+            setLoading(false);
+            console.log('LessonCreationForm: Lesson creation process finished.');
         }
-
-        const { data, error } = await supabase.from('lessons').insert([
-            {
-                module_id: moduleId,
-                title: newLessonTitle,
-                content: newLessonContent,
-                type: newLessonType,
-                video_url: videoUrlToSave,
-                document_url: documentUrlToSave,
-                order: 0, // Simplified ordering
-            },
-        ]).select();
-
-        if (error) {
-            console.error('Error creating lesson:', error);
-            setMessage(`Error creating lesson: ${error.message}`);
-        } else {
-            setMessage('Lesson created successfully!');
-            setNewLessonTitle('');
-            setNewLessonContent('');
-            setNewLessonType('text');
-            setNewLessonVideoUrl('');
-            setNewLessonDocumentUrl('');
-            onLessonCreate(data[0]); // Pass the new lesson back to parent
-            fetchCourseDetails(); // Trigger a re-fetch of course details in AdminDashboard
-        }
-        setLoading(false);
     };
 
     return (
@@ -576,6 +629,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                             setNewLessonType(e.target.value);
                             setNewLessonVideoUrl(''); // Clear URLs when type changes
                             setNewLessonDocumentUrl('');
+                            setNewLessonVideoFile(null); // Clear file input state
+                            setNewLessonDocumentFile(null); // Clear file input state
                         }}
                     >
                         <option value="text">Text</option>
@@ -586,33 +641,69 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 </div>
 
                 {newLessonType === 'video' && (
-                    <div>
-                        <label htmlFor={`newLessonVideoUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Video URL (Optional)</label>
-                        <input
-                            type="url"
-                            id={`newLessonVideoUrl-${moduleId}`}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                            placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ or direct .mp4 link"
-                            value={newLessonVideoUrl}
-                            onChange={(e) => setNewLessonVideoUrl(e.target.value)}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                            Paste a YouTube link or a direct link to a video file (.mp4, .webm, etc.).
-                        </p>
-                    </div>
+                    <>
+                        <div>
+                            <label htmlFor={`newLessonVideoUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Video URL (Optional)</label>
+                            <input
+                                type="url"
+                                id={`newLessonVideoUrl-${moduleId}`}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ or direct .mp4 link"
+                                value={newLessonVideoUrl}
+                                onChange={(e) => {
+                                    setNewLessonVideoUrl(e.target.value);
+                                    setNewLessonVideoFile(null); // Clear file if URL is typed
+                                }}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Paste a YouTube link or a direct link to a video file (.mp4, .webm, etc.).
+                            </p>
+                        </div>
+                        <div className="mt-2">
+                            <label htmlFor={`newLessonVideoFile-${moduleId}`} className="block text-sm font-medium text-gray-700">Or Upload Video from System</label>
+                            <input
+                                type="file"
+                                id={`newLessonVideoFile-${moduleId}`}
+                                accept="video/*"
+                                onChange={(e) => {
+                                    setNewLessonVideoFile(e.target.files[0]);
+                                    setNewLessonVideoUrl(''); // Clear URL if file is selected
+                                }}
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                        </div>
+                    </>
                 )}
                 {newLessonType === 'document' && (
-                    <div>
-                        <label htmlFor={`newLessonDocumentUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Document URL (Optional)</label>
-                        <input
-                            type="url"
-                            id={`newLessonDocumentUrl-${moduleId}`}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                            placeholder="e.g., https://example.com/document.pdf"
-                            value={newLessonDocumentUrl}
-                            onChange={(e) => setNewLessonDocumentUrl(e.target.value)}
-                        />
-                    </div>
+                    <>
+                        <div>
+                            <label htmlFor={`newLessonDocumentUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Document URL (Optional)</label>
+                            <input
+                                type="url"
+                                id={`newLessonDocumentUrl-${moduleId}`}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                placeholder="e.g., https://example.com/document.pdf"
+                                value={newLessonDocumentUrl}
+                                onChange={(e) => {
+                                    setNewLessonDocumentUrl(e.target.value);
+                                    setNewLessonDocumentFile(null); // Clear file if URL is typed
+                                }}
+                            />
+                        </div>
+                        <div className="mt-2">
+                            <label htmlFor={`newLessonDocumentFile-${moduleId}`} className="block text-sm font-medium text-gray-700">Or Upload Document from System</label>
+                            <input
+                                type="file"
+                                id={`newLessonDocumentFile-${moduleId}`}
+                                accept=".pdf,.doc,.docx,.ppt,.pptx"
+                                onChange={(e) => {
+                                    setNewLessonDocumentFile(e.target.files[0]);
+                                    setNewLessonDocumentUrl(''); // Clear URL if file is selected
+                                }}
+                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                        </div>
+                    </>
                 )}
 
                 <button
@@ -929,6 +1020,7 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                             {lesson.document_url && <p className="text-xs text-blue-500">Doc: <a href={lesson.document_url} target="_blank" rel="noopener noreferrer" className="underline">{lesson.document_url}</a></p>}
 
                                             <div className="mt-2 space-x-2">
+                                                {/* These are for updating existing lessons with files */}
                                                 <label className="block text-sm font-medium text-gray-700">Upload Video (for this lesson):</label>
                                                 <input
                                                     type="file"
