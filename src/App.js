@@ -6,7 +6,7 @@ import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, Chec
 // Supabase Configuration (replace with your actual values if different)
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
 // IMPORTANT: Replace 'YOUR_ACTUAL_SUPABASE_ANON_PUBLIC_KEY_HERE' with your actual anon public key from Supabase Project Settings -> API
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
+const supabaseAnonKey = 'YOUR_ACTUAL_SUPABASE_ANON_PUBLIC_KEY_HERE'; 
 
 // Create a context for Supabase and User data
 const AppContext = createContext();
@@ -560,16 +560,10 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             };
             console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
 
-            // Add a timeout to the Supabase insert operation
-            const insertPromise = supabase.from('lessons').insert([lessonDataToInsert]).select();
-
-            const timeoutPromise = new Promise((resolve, reject) =>
-                setTimeout(() => reject(new Error('Supabase insert operation timed out after 30 seconds.')), 30000) // 30 seconds timeout
-            );
-
-            console.log('LessonCreationForm: Awaiting Promise.race for insert operation...');
-            const { data, error } = await Promise.race([insertPromise, timeoutPromise]);
-            console.log('LessonCreationForm: Promise.race resolved.');
+            // Directly await the insert operation
+            console.log('LessonCreationForm: Directly awaiting Supabase insert operation...');
+            const { data, error } = await supabase.from('lessons').insert([lessonDataToInsert]).select();
+            console.log('LessonCreationForm: Supabase insert operation resolved.');
 
             if (error) {
                 console.error('LessonCreationForm: Error creating lesson (details):', error.message || JSON.stringify(error));
