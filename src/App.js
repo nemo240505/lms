@@ -19,6 +19,7 @@ const AppProvider = ({ children }) => {
 
     // Effect to load CDN scripts (Tailwind and Supabase)
     useEffect(() => {
+        console.log('AppProvider: Attempting to load CDN scripts...');
         const tailwindScript = document.createElement('script');
         tailwindScript.src = 'https://cdn.tailwindcss.com';
         document.head.appendChild(tailwindScript);
@@ -26,13 +27,18 @@ const AppProvider = ({ children }) => {
         const supabaseScript = document.createElement('script');
         supabaseScript.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.x.x/dist/umd/supabase.min.js'; // UMD build for global access
         supabaseScript.onload = () => {
-            console.log('Supabase script loaded.');
+            console.log('AppProvider: Supabase script loaded successfully.');
             setScriptsLoaded(true); // Mark Supabase script as loaded
         };
-        supabaseScript.onerror = (e) => console.error('Error loading Supabase script:', e);
+        supabaseScript.onerror = (e) => {
+            console.error('AppProvider: Error loading Supabase script:', e);
+            // Even if script fails, we might want to proceed or show an error message
+            // For now, let's keep loading true if it fails, or handle specific error UI
+        };
         document.head.appendChild(supabaseScript);
 
         return () => {
+            console.log('AppProvider: Cleaning up CDN scripts.');
             document.head.removeChild(tailwindScript);
             document.head.removeChild(supabaseScript);
         };
@@ -40,11 +46,16 @@ const AppProvider = ({ children }) => {
 
     // Effect to initialize Supabase client and fetch initial session/profile
     useEffect(() => {
+        console.log('AppProvider: scriptsLoaded state changed:', scriptsLoaded);
         // Only proceed if scripts are loaded and window.supabase.createClient is available
         if (scriptsLoaded && window.supabase && window.supabase.createClient && !supabaseClient) {
-            console.log('Initializing Supabase client...');
+            console.log('AppProvider: Initializing Supabase client...');
             const client = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
             setSupabaseClient(client);
+            console.log('AppProvider: Supabase client set.');
+        } else if (scriptsLoaded && !window.supabase) {
+            console.error('AppProvider: Supabase object not found on window after script load. Check script URL or content.');
+            setLoading(false); // Stop loading if Supabase global is not available
         }
     }, [scriptsLoaded, supabaseClient]); // Depend on scriptsLoaded and supabaseClient state
 
@@ -52,36 +63,48 @@ const AppProvider = ({ children }) => {
     useEffect(() => {
         const fetchSessionAndProfile = async () => {
             if (!supabaseClient) {
-                // console.log('Supabase client not ready, skipping session fetch.');
+                console.log('AppProvider: fetchSessionAndProfile skipped, Supabase client not ready.');
                 return; // Wait for client to be initialized
             }
 
-            setLoading(true);
+            setLoading(true); // Ensure loading is true at the start of this critical fetch
+            console.log('AppProvider: Starting fetchSessionAndProfile...');
             try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
+                const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+                if (sessionError) {
+                    console.error('AppProvider: Error getting session:', sessionError);
+                    setSession(null);
+                    setUserProfile(null);
+                    setLoading(false);
+                    return;
+                }
                 setSession(session);
+                console.log('AppProvider: Session fetched:', session);
 
                 if (session) {
-                    const { data: profile, error } = await supabaseClient
+                    const { data: profile, error: profileError } = await supabaseClient
                         .from('profiles')
                         .select('*')
                         .eq('id', session.user.id)
                         .single();
-                    if (error && profile === null) { // If there's an error AND data is null, it's likely "0 rows"
-                        console.log('Profile not found for user (or multiple profiles found), setting profile to null:', error);
+                    if (profileError && profile === null) { // If there's an error AND data is null, it's likely "0 rows"
+                        console.log('AppProvider: Profile not found for user (or multiple profiles found), setting profile to null:', profileError);
                         setUserProfile(null);
-                    } else if (error) { // Other types of errors
-                        console.error('Error fetching profile:', error);
+                    } else if (profileError) { // Other types of errors
+                        console.error('AppProvider: Error fetching profile:', profileError);
                         setUserProfile(null);
                     } else { // Profile found
+                        console.log('AppProvider: Profile fetched:', profile);
                         setUserProfile(profile);
                     }
                 } else {
+                    console.log('AppProvider: No session found, user is logged out.');
                     setUserProfile(null);
                 }
             } catch (error) {
-                console.error('Error during initial session/profile fetch:', error);
+                console.error('AppProvider: Error during initial session/profile fetch:', error);
             } finally {
+                console.log('AppProvider: fetchSessionAndProfile finished, setting loading to false.');
                 setLoading(false);
             }
         };
@@ -91,34 +114,39 @@ const AppProvider = ({ children }) => {
         // Set up auth listener
         let authListener = null;
         if (supabaseClient) {
+            console.log('AppProvider: Setting up auth state change listener.');
             authListener = supabaseClient.auth.onAuthStateChange(
                 async (_event, session) => {
+                    console.log('AppProvider: Auth state changed. Event:', _event, 'Session:', session);
                     setSession(session);
                     if (session) {
-                        const { data: profile, error } = await supabaseClient
+                        const { data: profile, error: profileError } = await supabaseClient
                             .from('profiles')
                             .select('*')
                             .eq('id', session.user.id)
                             .single();
-                        if (error && profile === null) { // If there's an error AND data is null, it's likely "0 rows"
-                            console.log('Profile not found on auth change, setting profile to null:', error);
+                        if (profileError && profile === null) {
+                            console.log('AppProvider: Profile not found on auth change, setting profile to null:', profileError);
                             setUserProfile(null);
-                        } else if (error) { // Other types of errors
-                            console.error('Error fetching profile on auth change:', error);
+                        } else if (profileError) {
+                            console.error('AppProvider: Error fetching profile on auth change:', profileError);
                             setUserProfile(null);
-                        } else { // Profile found
+                        } else {
+                            console.log('AppProvider: Profile fetched on auth change:', profile);
                             setUserProfile(profile);
                         }
                     } else {
+                        console.log('AppProvider: No session on auth change, user is logged out.');
                         setUserProfile(null);
                     }
-                    setLoading(false);
+                    // setLoading(false); // This might be problematic if other async ops are still running
                 }
             );
         }
 
         return () => {
             if (authListener && authListener.data && authListener.data.subscription) {
+                console.log('AppProvider: Unsubscribing from auth listener.');
                 authListener.data.subscription.unsubscribe();
             }
         };
@@ -126,6 +154,8 @@ const AppProvider = ({ children }) => {
 
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient})`);
+
 
     return (
         <AppContext.Provider value={{ supabase: supabaseClient, session, userProfile, loading: overallLoading, setUserProfile }}>
@@ -173,21 +203,27 @@ const AuthPage = ({ setCurrentPage }) => {
         }
 
         if (isLogin) {
+            console.log('AuthPage: Attempting to sign in...');
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            console.log('AuthPage: signInWithPassword result - data:', data, 'error:', error);
+
             if (error) {
                 setMessage(error.message);
             } else {
                 // Fetch profile to set the userProfile in context
+                console.log('AuthPage: Signed in successfully. Attempting to fetch profile for user ID:', data.user.id);
                 const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('id', data.user.id)
                     .single();
+                console.log('AuthPage: Profile fetch result - profile:', profile, 'error:', profileError);
+
                 if (profileError && profile === null) { // If there's an error AND data is null, it's likely "0 rows"
-                    console.log('Profile not found after login, setting profile to null:', profileError);
+                    console.log('AuthPage: Profile not found after login, setting profile to null:', profileError);
                     setUserProfile(null);
                 } else if (profileError) { // Other types of errors
-                    console.error('Error fetching profile after login:', profileError);
+                    console.error('AuthPage: Error fetching profile after login:', profileError);
                     setUserProfile(null);
                 } else { // Profile found
                     setUserProfile(profile);
@@ -196,6 +232,7 @@ const AuthPage = ({ setCurrentPage }) => {
             }
         } else {
             // Signup flow
+            console.log('AuthPage: Attempting to sign up...');
             if (selectedExams.length === 0) {
                 setMessage('Please select at least one exam you want to register for.');
                 setLoading(false);
@@ -208,16 +245,21 @@ const AuthPage = ({ setCurrentPage }) => {
             }
 
             const { data, error } = await supabase.auth.signUp({ email, password });
+            console.log('AuthPage: signUp result - data:', data, 'error:', error);
+
             if (error) {
                 setMessage(error.message);
             } else if (data.user) {
                 // User successfully created in auth.users
-                console.log('Supabase Auth User created:', data.user); // Log the created user
+                console.log('AuthPage: Supabase Auth User created:', data.user); // Log the created user
 
                 // Explicitly get the current session and user ID again to ensure RLS context is fresh
+                console.log('AuthPage: Getting current session for profile insert...');
                 const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+                console.log('AuthPage: getSession result - currentSession:', currentSession, 'sessionError:', sessionError);
+
                 if (sessionError) {
-                    console.error('Error getting session after signup:', sessionError);
+                    console.error('AuthPage: Error getting session after signup:', sessionError);
                     setMessage('Signup successful, but failed to get session. Please try logging in.');
                     setLoading(false);
                     return;
@@ -230,10 +272,10 @@ const AuthPage = ({ setCurrentPage }) => {
                 }
 
                 const userId = currentSession.user.id;
-                console.log('User ID from current session for profile insert:', userId);
+                console.log('AuthPage: User ID from current session for profile insert:', userId);
 
                 // Insert profile for new user, including selected exams
-                console.log('Attempting to insert new profile with data:', {
+                console.log('AuthPage: Attempting to insert new profile with data:', {
                     id: userId, // Use ID from current session
                     email: email,
                     name: name,
@@ -248,13 +290,25 @@ const AuthPage = ({ setCurrentPage }) => {
                     role: 'student', // Default role for new signups
                     registered_exams: selectedExams, // Save selected exams
                 });
+                console.log('AuthPage: Profile insert result - profileError:', profileError);
 
                 if (profileError) {
                     // Log the error more thoroughly
-                    console.error('Error creating profile (details):', profileError.message || JSON.stringify(profileError));
+                    console.error('AuthPage: Error creating profile (details):', profileError.message || JSON.stringify(profileError));
                     setMessage(`Signup successful, but failed to create profile: ${profileError.message || 'Please check Supabase RLS for "profiles" table and schema.'}`);
                 } else {
                     setMessage('Signup successful! Please check your email for verification.');
+                    // Optionally, re-fetch profile after successful insert to update context immediately
+                    const { data: newProfile, error: newProfileError } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', userId)
+                        .single();
+                    if (!newProfileError) {
+                        setUserProfile(newProfile);
+                    } else {
+                        console.error('AuthPage: Error re-fetching profile after successful insert:', newProfileError);
+                    }
                 }
             }
         }
@@ -268,12 +322,14 @@ const AuthPage = ({ setCurrentPage }) => {
             setLoading(false);
             return;
         }
+        console.log('AuthPage: Attempting Google OAuth login...');
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
                 redirectTo: window.location.origin, // Redirects back to the app root
             }
         });
+        console.log('AuthPage: Google OAuth result - error:', error);
         if (error) {
             setMessage(error.message);
         }
@@ -1337,7 +1393,7 @@ const ProfilePage = ({ setCurrentPage }) => {
             </div>
             {message && (
                 <div className="mt-4 p-3 bg-blue-100 text-blue-700 rounded text-center">
-                    {message}
+                        {message}
                 </div>
             )}
         </div>
