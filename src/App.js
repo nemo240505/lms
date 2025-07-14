@@ -479,6 +479,160 @@ const Header = ({ setCurrentPage }) => {
     );
 };
 
+// Lesson Creation Form Component
+const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) => {
+    const { supabase } = useContext(AppContext);
+    const [newLessonTitle, setNewLessonTitle] = useState('');
+    const [newLessonContent, setNewLessonContent] = useState('');
+    const [newLessonType, setNewLessonType] = useState('text');
+    const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
+    const [newLessonDocumentUrl, setNewLessonDocumentUrl] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
+
+    const handleCreateLesson = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setMessage('');
+
+        if (!newLessonTitle || !newLessonContent) {
+            setMessage('Please fill lesson title and content.');
+            setLoading(false);
+            return;
+        }
+
+        let videoUrlToSave = null;
+        let documentUrlToSave = null;
+
+        if (newLessonType === 'video' && newLessonVideoUrl) {
+            videoUrlToSave = newLessonVideoUrl;
+        } else if (newLessonType === 'document' && newLessonDocumentUrl) {
+            documentUrlToSave = newLessonDocumentUrl;
+        }
+
+        const { data, error } = await supabase.from('lessons').insert([
+            {
+                module_id: moduleId,
+                title: newLessonTitle,
+                content: newLessonContent,
+                type: newLessonType,
+                video_url: videoUrlToSave,
+                document_url: documentUrlToSave,
+                order: 0, // Simplified ordering
+            },
+        ]).select();
+
+        if (error) {
+            console.error('Error creating lesson:', error);
+            setMessage(`Error creating lesson: ${error.message}`);
+        } else {
+            setMessage('Lesson created successfully!');
+            setNewLessonTitle('');
+            setNewLessonContent('');
+            setNewLessonType('text');
+            setNewLessonVideoUrl('');
+            setNewLessonDocumentUrl('');
+            onLessonCreate(data[0]); // Pass the new lesson back to parent
+            fetchCourseDetails(); // Trigger a re-fetch of course details in AdminDashboard
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div className="border border-dashed border-gray-300 p-4 rounded-md mb-4">
+            <h4 className="text-lg font-medium text-gray-700 mb-3">Add New Lesson</h4>
+            <form onSubmit={handleCreateLesson} className="space-y-3">
+                <div>
+                    <label htmlFor={`lessonTitle-${moduleId}`} className="block text-sm font-medium text-gray-700">Lesson Title</label>
+                    <input
+                        type="text"
+                        id={`lessonTitle-${moduleId}`}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                        placeholder="Lesson Title"
+                        value={newLessonTitle}
+                        onChange={(e) => setNewLessonTitle(e.target.value)}
+                        required
+                    />
+                </div>
+                <div>
+                    <label htmlFor={`lessonContent-${moduleId}`} className="block text-sm font-medium text-gray-700">Lesson Content</label>
+                    <textarea
+                        id={`lessonContent-${moduleId}`}
+                        rows="3"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                        placeholder="Detailed lesson content (text, instructions, etc.)"
+                        value={newLessonContent}
+                        onChange={(e) => setNewLessonContent(e.target.value)}
+                        required
+                    ></textarea>
+                </div>
+                <div>
+                    <label htmlFor={`lessonType-${moduleId}`} className="block text-sm font-medium text-gray-700">Lesson Type</label>
+                    <select
+                        id={`lessonType-${moduleId}`}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                        value={newLessonType}
+                        onChange={(e) => {
+                            setNewLessonType(e.target.value);
+                            setNewLessonVideoUrl(''); // Clear URLs when type changes
+                            setNewLessonDocumentUrl('');
+                        }}
+                    >
+                        <option value="text">Text</option>
+                        <option value="video">Video</option>
+                        <option value="document">Document</option>
+                        {/* <option value="quiz">Quiz</option> */}
+                    </select>
+                </div>
+
+                {newLessonType === 'video' && (
+                    <div>
+                        <label htmlFor={`newLessonVideoUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Video URL (Optional)</label>
+                        <input
+                            type="url"
+                            id={`newLessonVideoUrl-${moduleId}`}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ or direct .mp4 link"
+                            value={newLessonVideoUrl}
+                            onChange={(e) => setNewLessonVideoUrl(e.target.value)}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Paste a YouTube link or a direct link to a video file (.mp4, .webm, etc.).
+                        </p>
+                    </div>
+                )}
+                {newLessonType === 'document' && (
+                    <div>
+                        <label htmlFor={`newLessonDocumentUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Document URL (Optional)</label>
+                        <input
+                            type="url"
+                            id={`newLessonDocumentUrl-${moduleId}`}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                            placeholder="e.g., https://example.com/document.pdf"
+                            value={newLessonDocumentUrl}
+                            onChange={(e) => setNewLessonDocumentUrl(e.target.value)}
+                        />
+                    </div>
+                )}
+
+                <button
+                    type="submit"
+                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-200"
+                    disabled={loading}
+                >
+                    {loading ? 'Adding...' : 'Add Lesson'}
+                </button>
+            </form>
+            {message && (
+                <div className="mt-3 p-2 bg-blue-100 text-blue-700 rounded text-sm">
+                    {message}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 // Admin Dashboard
 const AdminDashboard = ({ setCurrentPage }) => {
     const { supabase, userProfile } = useContext(AppContext);
@@ -490,11 +644,6 @@ const AdminDashboard = ({ setCurrentPage }) => {
 
     const [selectedCourse, setSelectedCourse] = useState(null);
     const [newModuleName, setNewModuleName] = useState('');
-    const [newLessonTitle, setNewLessonTitle] = useState('');
-    const [newLessonContent, setNewLessonContent] = useState('');
-    const [newLessonType, setNewLessonType] = useState('text');
-    const [newLessonVideoUrl, setNewLessonVideoUrl] = useState(''); // New state for video URL
-    const [newLessonDocumentUrl, setNewLessonDocumentUrl] = useState(''); // New state for document URL
 
     const [uploading, setUploading] = useState(false);
     const [uploadMessage, setUploadMessage] = useState('');
@@ -568,44 +717,14 @@ const AdminDashboard = ({ setCurrentPage }) => {
         }
     };
 
-    const handleCreateLesson = async (e, moduleId) => {
-        e.preventDefault();
-        if (!newLessonTitle || !newLessonContent || !moduleId || !supabase) {
-            alert('Please fill lesson title and content.');
-            return;
-        }
-
-        // Determine which URL to save based on lesson type
-        let videoUrlToSave = null;
-        let documentUrlToSave = null;
-
-        if (newLessonType === 'video' && newLessonVideoUrl) {
-            videoUrlToSave = newLessonVideoUrl;
-        } else if (newLessonType === 'document' && newLessonDocumentUrl) {
-            documentUrlToSave = newLessonDocumentUrl;
-        }
-
-        const { data, error } = await supabase.from('lessons').insert([
-            {
-                module_id: moduleId,
-                title: newLessonTitle,
-                content: newLessonContent,
-                type: newLessonType,
-                video_url: videoUrlToSave,      // Use the URL if provided
-                document_url: documentUrlToSave, // Use the URL if provided
-                order: 0, // Simplified ordering
-            },
-        ]).select();
-        if (error) console.error('Error creating lesson:', error);
-        else {
-            setNewLessonTitle('');
-            setNewLessonContent('');
-            setNewLessonType('text'); // Reset to default
-            setNewLessonVideoUrl(''); // Clear URL fields
-            setNewLessonDocumentUrl('');
-            fetchCourseDetails(selectedCourse.id); // Re-fetch all details
-        }
+    // This function will be passed to LessonCreationForm
+    const handleAddNewLesson = (newLesson) => {
+        // This callback is triggered when a lesson is successfully created in LessonCreationForm
+        // We can use it to update the selectedCourse state to reflect the new lesson
+        // For simplicity, we'll just re-fetch the entire course details
+        fetchCourseDetails(selectedCourse.id);
     };
+
 
     const handleFileUpload = async (event, lessonId, type) => {
         const file = event.target.files[0];
@@ -792,89 +911,12 @@ const AdminDashboard = ({ setCurrentPage }) => {
                             <div key={module.id} className="border border-gray-200 rounded-md p-4 bg-gray-50">
                                 <h3 className="text-xl font-bold text-gray-800 mb-3">{module.title}</h3>
 
-                                {/* Add Lesson */}
-                                <div className="border border-dashed border-gray-300 p-4 rounded-md mb-4">
-                                    <h4 className="text-lg font-medium text-gray-700 mb-3">Add New Lesson to {module.title}</h4>
-                                    <form onSubmit={(e) => handleCreateLesson(e, module.id)} className="space-y-3">
-                                        <div>
-                                            <label htmlFor={`lessonTitle-${module.id}`} className="block text-sm font-medium text-gray-700">Lesson Title</label>
-                                            <input
-                                                type="text"
-                                                id={`lessonTitle-${module.id}`}
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                                placeholder="Lesson Title"
-                                                value={newLessonTitle}
-                                                onChange={(e) => setNewLessonTitle(e.target.value)}
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label htmlFor={`lessonContent-${module.id}`} className="block text-sm font-medium text-gray-700">Lesson Content</label>
-                                            <textarea
-                                                id={`lessonContent-${module.id}`}
-                                                rows="3"
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                                placeholder="Detailed lesson content (text, instructions, etc.)"
-                                                value={newLessonContent}
-                                                onChange={(e) => setNewLessonContent(e.target.value)}
-                                                required
-                                            ></textarea>
-                                        </div>
-                                        <div>
-                                            <label htmlFor={`lessonType-${module.id}`} className="block text-sm font-medium text-gray-700">Lesson Type</label>
-                                            <select
-                                                id={`lessonType-${module.id}`}
-                                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                                value={newLessonType}
-                                                onChange={(e) => {
-                                                    setNewLessonType(e.target.value);
-                                                    setNewLessonVideoUrl(''); // Clear URLs when type changes
-                                                    setNewLessonDocumentUrl('');
-                                                }}
-                                            >
-                                                <option value="text">Text</option>
-                                                <option value="video">Video</option>
-                                                <option value="document">Document</option>
-                                                {/* <option value="quiz">Quiz</option> */}
-                                            </select>
-                                        </div>
-
-                                        {/* Conditional URL inputs for new lessons */}
-                                        {newLessonType === 'video' && (
-                                            <div>
-                                                <label htmlFor={`newLessonVideoUrl-${module.id}`} className="block text-sm font-medium text-gray-700">Video URL (Optional)</label>
-                                                <input
-                                                    type="url"
-                                                    id={`newLessonVideoUrl-${module.id}`}
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                                    placeholder="e.g., https://www.youtube.com/watch?v=..."
-                                                    value={newLessonVideoUrl}
-                                                    onChange={(e) => setNewLessonVideoUrl(e.target.value)}
-                                                />
-                                            </div>
-                                        )}
-                                        {newLessonType === 'document' && (
-                                            <div>
-                                                <label htmlFor={`newLessonDocumentUrl-${module.id}`} className="block text-sm font-medium text-gray-700">Document URL (Optional)</label>
-                                                <input
-                                                    type="url"
-                                                    id={`newLessonDocumentUrl-${module.id}`}
-                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                                                    placeholder="e.g., https://example.com/document.pdf"
-                                                    value={newLessonDocumentUrl}
-                                                    onChange={(e) => setNewLessonDocumentUrl(e.target.value)}
-                                                />
-                                            </div>
-                                        )}
-
-                                        <button
-                                            type="submit"
-                                            className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-200"
-                                        >
-                                            Add Lesson
-                                        </button>
-                                    </form>
-                                </div>
+                                {/* Add Lesson Form (now a separate component) */}
+                                <LessonCreationForm
+                                    moduleId={module.id}
+                                    onLessonCreate={handleAddNewLesson}
+                                    fetchCourseDetails={() => fetchCourseDetails(selectedCourse.id)} // Pass callback to re-fetch course
+                                />
 
                                 {/* Lessons in Module */}
                                 <h4 className="text-lg font-medium text-gray-700 mb-2">Lessons:</h4>
@@ -1107,6 +1149,13 @@ const CourseView = ({ courseId, setCurrentPage }) => {
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState({}); // { lesson_id: completed_status }
 
+    // Helper to extract YouTube video ID
+    const getYouTubeVideoId = (url) => {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    };
+
     useEffect(() => {
         if (courseId && userProfile?.id && supabase) { // Ensure all dependencies are available
             fetchCourseDetails();
@@ -1197,6 +1246,8 @@ const CourseView = ({ courseId, setCurrentPage }) => {
     if (loading) return <div className="p-6 text-center">Loading course content...</div>;
     if (!course) return <div className="p-6 text-center text-red-600">Course not found or access denied.</div>;
 
+    const youtubeVideoId = selectedLesson?.video_url ? getYouTubeVideoId(selectedLesson.video_url) : null;
+
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
             <h1 className="text-3xl font-bold text-gray-800 mb-4">{course.title}</h1>
@@ -1242,13 +1293,21 @@ const CourseView = ({ courseId, setCurrentPage }) => {
                             <h2 className="text-2xl font-bold text-gray-800 mb-4">{selectedLesson.title}</h2>
                             {selectedLesson.video_url && (
                                 <div className="mb-4 aspect-video bg-black rounded-lg overflow-hidden">
-                                    {/* Basic HTML5 video player */}
-                                    <video controls className="w-full h-full">
-                                        <source src={selectedLesson.video_url} type="video/mp4" />
-                                        Your browser does not support the video tag.
-                                    </video>
-                                    {/* For YouTube/Vimeo, you'd use a library like react-player */}
-                                    {/* <ReactPlayer url={selectedLesson.video_url} controls width="100%" height="auto" /> */}
+                                    {youtubeVideoId ? (
+                                        <iframe
+                                            className="w-full h-full"
+                                            src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+                                            title="YouTube video player"
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        ></iframe>
+                                    ) : (
+                                        <video controls className="w-full h-full">
+                                            <source src={selectedLesson.video_url} type="video/mp4" />
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    )}
                                 </div>
                             )}
                             <div className="prose max-w-none mb-6 text-gray-700" dangerouslySetInnerHTML={{ __html: selectedLesson.content }} />
