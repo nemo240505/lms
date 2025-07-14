@@ -5,7 +5,7 @@ import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, Chec
 
 // Supabase Configuration (replace with your actual values if different)
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI';
 
 // Create a context for Supabase and User data
 const AppContext = createContext();
@@ -521,6 +521,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             if (newLessonType === 'video' && newLessonVideoFile) {
                 setMessage('Uploading video file...');
                 const videoFilePath = `${moduleId}/videos/${Date.now()}-${newLessonVideoFile.name}`;
+                console.log('LessonCreationForm: Uploading video to path:', videoFilePath);
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('course-videos')
                     .upload(videoFilePath, newLessonVideoFile);
@@ -539,6 +540,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             if (newLessonType === 'document' && newLessonDocumentFile) {
                 setMessage('Uploading document file...');
                 const documentFilePath = `${moduleId}/documents/${Date.now()}-${newLessonDocumentFile.name}`;
+                console.log('LessonCreationForm: Uploading document to path:', documentFilePath);
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('course-documents')
                     .upload(documentFilePath, newLessonDocumentFile);
@@ -553,7 +555,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 console.log('LessonCreationForm: Document file uploaded. Public URL:', finalDocumentUrl);
             }
 
-            console.log('LessonCreationForm: Calling Supabase insert for lessons table with final URLs...');
+            console.log('LessonCreationForm: Calling Supabase insert for lessons table with final URLs:', { finalVideoUrl, finalDocumentUrl });
             const { data, error } = await supabase.from('lessons').insert([
                 {
                     module_id: moduleId,
