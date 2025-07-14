@@ -33,6 +33,7 @@ const AppProvider = ({ children }) => {
         supabaseScript.onerror = (e) => {
             console.error('AppProvider: Error loading Supabase script:', e);
             // Even if script fails, we might want to proceed or show an error message
+            // For now, let's keep loading true if it:// Even if script fails, we might want to proceed or show an error message
             // For now, let's keep loading true if it fails, or handle specific error UI
         };
         document.head.appendChild(supabaseScript);
@@ -253,62 +254,52 @@ const AuthPage = ({ setCurrentPage }) => {
                 // User successfully created in auth.users
                 console.log('AuthPage: Supabase Auth User created:', data.user); // Log the created user
 
-                // Explicitly get the current session and user ID again to ensure RLS context is fresh
-                console.log('AuthPage: Getting current session for profile insert...');
-                const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-                console.log('AuthPage: getSession result - currentSession:', currentSession, 'sessionError:', sessionError);
-
-                if (sessionError) {
-                    console.error('AuthPage: Error getting session after signup:', sessionError);
-                    setMessage('Signup successful, but failed to get session. Please try logging in.');
-                    setLoading(false);
-                    return;
-                }
-
-                if (!currentSession || !currentSession.user) {
-                    setMessage('Signup successful, but user session not immediately available. Please try logging in.');
-                    setLoading(false);
-                    return;
-                }
-
-                const userId = currentSession.user.id;
-                console.log('AuthPage: User ID from current session for profile insert:', userId);
+                // *** CRITICAL CHANGE: Use data.user.id directly for profile insertion ***
+                // Removed the getSession call here as it was causing issues with immediate session availability
+                const userId = data.user.id; // Use the ID directly from the signUp response
+                console.log('AuthPage: User ID from signUp response for profile insert:', userId);
 
                 // Insert profile for new user, including selected exams
                 console.log('AuthPage: Attempting to insert new profile with data:', {
-                    id: userId, // Use ID from current session
+                    id: userId, // Use ID from signUp response
                     email: email,
                     name: name,
                     role: 'student', // Default role for new signups
                     registered_exams: selectedExams, // Save selected exams
                 });
 
-                const { error: profileError } = await supabase.from('profiles').insert({
-                    id: userId, // Use ID from current session
-                    email: email,
-                    name: name,
-                    role: 'student', // Default role for new signups
-                    registered_exams: selectedExams, // Save selected exams
-                });
-                console.log('AuthPage: Profile insert result - profileError:', profileError);
+                try {
+                    const { error: profileError } = await supabase.from('profiles').insert({
+                        id: userId, // Use ID from signUp response
+                        email: email,
+                        name: name,
+                        role: 'student', // Default role for new signups
+                        registered_exams: selectedExams, // Save selected exams
+                    });
+                    console.log('AuthPage: Profile insert result - profileError:', profileError);
 
-                if (profileError) {
-                    // Log the error more thoroughly
-                    console.error('AuthPage: Error creating profile (details):', profileError.message || JSON.stringify(profileError));
-                    setMessage(`Signup successful, but failed to create profile: ${profileError.message || 'Please check Supabase RLS for "profiles" table and schema.'}`);
-                } else {
-                    setMessage('Signup successful! Please check your email for verification.');
-                    // Optionally, re-fetch profile after successful insert to update context immediately
-                    const { data: newProfile, error: newProfileError } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', userId)
-                        .single();
-                    if (!newProfileError) {
-                        setUserProfile(newProfile);
+                    if (profileError) {
+                        // Log the error more thoroughly
+                        console.error('AuthPage: Error creating profile (details):', profileError.message || JSON.stringify(profileError));
+                        setMessage(`Signup successful, but failed to create profile: ${profileError.message || 'Please check Supabase RLS for "profiles" table and schema.'}`);
                     } else {
-                        console.error('AuthPage: Error re-fetching profile after successful insert:', newProfileError);
+                        setMessage('Signup successful! Please check your email for verification.');
+                        // Re-fetch profile after successful insert to update context immediately
+                        const { data: newProfile, error: newProfileError } = await supabase
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', userId)
+                            .single();
+                        if (!newProfileError) {
+                            setUserProfile(newProfile);
+                            console.log('AuthPage: User profile set in context after successful signup and insert.');
+                        } else {
+                            console.error('AuthPage: Error re-fetching profile after successful insert:', newProfileError);
+                        }
                     }
+                } catch (insertError) {
+                    console.error('AuthPage: Unexpected error during profile insert:', insertError);
+                    setMessage(`Signup successful, but an unexpected error occurred during profile creation: ${insertError.message}`);
                 }
             }
         }
