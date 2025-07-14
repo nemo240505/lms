@@ -5,7 +5,8 @@ import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, Chec
 
 // Supabase Configuration (replace with your actual values if different)
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI';
+// IMPORTANT: Replace 'YOUR_ACTUAL_SUPABASE_ANON_PUBLIC_KEY_HERE' with your actual anon public key from Supabase Project Settings -> API
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
 
 // Create a context for Supabase and User data
 const AppContext = createContext();
@@ -327,29 +328,13 @@ const AuthPage = ({ setCurrentPage }) => {
                     {isLogin ? 'Login' : 'Sign Up'}
                 </h2>
                 <form onSubmit={handleAuth} className="space-y-4">
-                    {!isLogin && (
-                        <div>
-                            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="name">
-                                Name
-                            </label>
-                            <input
-                                type="text"
-                                id="name"
-                                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                                placeholder="Your Name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                required={!isLogin}
-                            />
-                        </div>
-                    )}
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="authEmail">
                             Email
                         </label>
                         <input
                             type="email"
-                            id="email"
+                            id="authEmail" // Added ID for accessibility
                             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             placeholder="Email"
                             value={email}
@@ -358,12 +343,12 @@ const AuthPage = ({ setCurrentPage }) => {
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="authPassword">
                             Password
                         </label>
                         <input
                             type="password"
-                            id="password"
+                            id="authPassword" // Added ID for accessibility
                             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
                             placeholder="Password"
                             value={password}
@@ -372,25 +357,42 @@ const AuthPage = ({ setCurrentPage }) => {
                         />
                     </div>
                     {!isLogin && (
-                        <div>
-                            <label className="block text-gray-700 text-sm font-bold mb-2">
-                                Select Exams (Multiple allowed)
-                            </label>
-                            <div className="flex flex-wrap gap-3 p-2 border border-gray-300 rounded-md bg-gray-50">
-                                {availableExams.map((exam) => (
-                                    <label key={exam} className="inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            className="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                                            value={exam}
-                                            checked={selectedExams.includes(exam)}
-                                            onChange={() => handleExamSelection(exam)}
-                                        />
-                                        <span className="ml-2 text-gray-700 font-medium">{exam}</span>
-                                    </label>
-                                ))}
+                        <>
+                            <div>
+                                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="authName">
+                                    Name
+                                </label>
+                                <input
+                                    type="text"
+                                    id="authName" // Added ID for accessibility
+                                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    placeholder="Your Name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    required={!isLogin}
+                                />
                             </div>
-                        </div>
+                            <div>
+                                <label className="block text-gray-700 text-sm font-bold mb-2">
+                                    Select Exams (Multiple allowed)
+                                </label>
+                                <div className="flex flex-wrap gap-3 p-2 border border-gray-300 rounded-md bg-gray-50">
+                                    {availableExams.map((exam) => (
+                                        <label key={exam} htmlFor={`exam-${exam}`} className="inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                id={`exam-${exam}`} // Added ID for accessibility
+                                                className="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                                                value={exam}
+                                                checked={selectedExams.includes(exam)}
+                                                onChange={() => handleExamSelection(exam)}
+                                            />
+                                            <span className="ml-2 text-gray-700 font-medium">{exam}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
                     )}
                     <button
                         type="submit"
@@ -496,16 +498,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
         e.preventDefault();
         setLoading(true);
         setMessage('Adding lesson...'); // Provide immediate feedback
-        console.log('LessonCreationForm: Attempting to create lesson for module:', moduleId);
-        console.log('LessonCreationForm: Lesson data:', {
-            title: newLessonTitle,
-            content: newLessonContent,
-            type: newLessonType,
-            video_url: newLessonVideoUrl,
-            document_url: newLessonDocumentUrl,
-            video_file: newLessonVideoFile ? newLessonVideoFile.name : 'none',
-            document_file: newLessonDocumentFile ? newLessonDocumentFile.name : 'none',
-        });
+        console.log('LessonCreationForm: Starting lesson creation process...');
 
         if (!newLessonTitle || !newLessonContent) {
             setMessage('Please fill lesson title and content.');
@@ -521,7 +514,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             if (newLessonType === 'video' && newLessonVideoFile) {
                 setMessage('Uploading video file...');
                 const videoFilePath = `${moduleId}/videos/${Date.now()}-${newLessonVideoFile.name}`;
-                console.log('LessonCreationForm: Uploading video to path:', videoFilePath);
+                console.log('LessonCreationForm: Attempting video upload to path:', videoFilePath);
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('course-videos')
                     .upload(videoFilePath, newLessonVideoFile);
@@ -540,7 +533,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             if (newLessonType === 'document' && newLessonDocumentFile) {
                 setMessage('Uploading document file...');
                 const documentFilePath = `${moduleId}/documents/${Date.now()}-${newLessonDocumentFile.name}`;
-                console.log('LessonCreationForm: Uploading document to path:', documentFilePath);
+                console.log('LessonCreationForm: Attempting document upload to path:', documentFilePath);
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('course-documents')
                     .upload(documentFilePath, newLessonDocumentFile);
@@ -555,24 +548,34 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 console.log('LessonCreationForm: Document file uploaded. Public URL:', finalDocumentUrl);
             }
 
-            console.log('LessonCreationForm: Calling Supabase insert for lessons table with final URLs:', { finalVideoUrl, finalDocumentUrl });
-            const { data, error } = await supabase.from('lessons').insert([
-                {
-                    module_id: moduleId,
-                    title: newLessonTitle,
-                    content: newLessonContent,
-                    type: newLessonType,
-                    video_url: finalVideoUrl,
-                    document_url: finalDocumentUrl,
-                    order: 0, // Simplified ordering
-                },
-            ]).select(); // Added .select() to get the inserted data back
-            console.log('LessonCreationForm: Supabase insert result - data:', data, 'error:', error);
+            console.log('LessonCreationForm: Preparing to insert lesson into database...');
+            const lessonDataToInsert = {
+                module_id: moduleId,
+                title: newLessonTitle,
+                content: newLessonContent,
+                type: newLessonType,
+                video_url: finalVideoUrl,
+                document_url: finalDocumentUrl,
+                order: 0, // Simplified ordering
+            };
+            console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
+
+            // Add a timeout to the Supabase insert operation
+            const insertPromise = supabase.from('lessons').insert([lessonDataToInsert]).select();
+
+            const timeoutPromise = new Promise((resolve, reject) =>
+                setTimeout(() => reject(new Error('Supabase insert operation timed out after 30 seconds.')), 30000) // 30 seconds timeout
+            );
+
+            console.log('LessonCreationForm: Awaiting Promise.race for insert operation...');
+            const { data, error } = await Promise.race([insertPromise, timeoutPromise]);
+            console.log('LessonCreationForm: Promise.race resolved.');
 
             if (error) {
                 console.error('LessonCreationForm: Error creating lesson (details):', error.message || JSON.stringify(error));
                 setMessage(`Error creating lesson: ${error.message || 'Unknown error. Check console.'}`);
             } else {
+                console.log('LessonCreationForm: Lesson created successfully. Data:', data);
                 setMessage('Lesson created successfully!');
                 setNewLessonTitle('');
                 setNewLessonContent('');
@@ -601,7 +604,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                     <label htmlFor={`lessonTitle-${moduleId}`} className="block text-sm font-medium text-gray-700">Lesson Title</label>
                     <input
                         type="text"
-                        id={`lessonTitle-${moduleId}`}
+                        id={`lessonTitle-${moduleId}`} // Added ID for accessibility
+                        name={`lessonTitle-${moduleId}`} // Added name for autofill/accessibility
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                         placeholder="Lesson Title"
                         value={newLessonTitle}
@@ -612,7 +616,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 <div>
                     <label htmlFor={`lessonContent-${moduleId}`} className="block text-sm font-medium text-gray-700">Lesson Content</label>
                     <textarea
-                        id={`lessonContent-${moduleId}`}
+                        id={`lessonContent-${moduleId}`} // Added ID for accessibility
+                        name={`lessonContent-${moduleId}`} // Added name for autofill/accessibility
                         rows="3"
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                         placeholder="Detailed lesson content (text, instructions, etc.)"
@@ -624,7 +629,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 <div>
                     <label htmlFor={`lessonType-${moduleId}`} className="block text-sm font-medium text-gray-700">Lesson Type</label>
                     <select
-                        id={`lessonType-${moduleId}`}
+                        id={`lessonType-${moduleId}`} // Added ID for accessibility
+                        name={`lessonType-${moduleId}`} // Added name for autofill/accessibility
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                         value={newLessonType}
                         onChange={(e) => {
@@ -648,7 +654,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                             <label htmlFor={`newLessonVideoUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Video URL (Optional)</label>
                             <input
                                 type="url"
-                                id={`newLessonVideoUrl-${moduleId}`}
+                                id={`newLessonVideoUrl-${moduleId}`} // Added ID for accessibility
+                                name={`newLessonVideoUrl-${moduleId}`} // Added name for autofill/accessibility
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ or direct .mp4 link"
                                 value={newLessonVideoUrl}
@@ -665,7 +672,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                             <label htmlFor={`newLessonVideoFile-${moduleId}`} className="block text-sm font-medium text-gray-700">Or Upload Video from System</label>
                             <input
                                 type="file"
-                                id={`newLessonVideoFile-${moduleId}`}
+                                id={`newLessonVideoFile-${moduleId}`} // Added ID for accessibility
+                                name={`newLessonVideoFile-${moduleId}`} // Added name for autofill/accessibility
                                 accept="video/*"
                                 onChange={(e) => {
                                     setNewLessonVideoFile(e.target.files[0]);
@@ -682,7 +690,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                             <label htmlFor={`newLessonDocumentUrl-${moduleId}`} className="block text-sm font-medium text-gray-700">Document URL (Optional)</label>
                             <input
                                 type="url"
-                                id={`newLessonDocumentUrl-${moduleId}`}
+                                id={`newLessonDocumentUrl-${moduleId}`} // Added ID for accessibility
+                                name={`newLessonDocumentUrl-${moduleId}`} // Added name for autofill/accessibility
                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                 placeholder="e.g., https://example.com/document.pdf"
                                 value={newLessonDocumentUrl}
@@ -696,7 +705,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                             <label htmlFor={`newLessonDocumentFile-${moduleId}`} className="block text-sm font-medium text-gray-700">Or Upload Document from System</label>
                             <input
                                 type="file"
-                                id={`newLessonDocumentFile-${moduleId}`}
+                                id={`newLessonDocumentFile-${moduleId}`} // Added ID for accessibility
+                                name={`newLessonDocumentFile-${moduleId}`} // Added name for autofill/accessibility
                                 accept=".pdf,.doc,.docx,.ppt,.pptx"
                                 onChange={(e) => {
                                     setNewLessonDocumentFile(e.target.files[0]);
@@ -888,6 +898,7 @@ const AdminDashboard = ({ setCurrentPage }) => {
                         <input
                             type="text"
                             id="courseTitle"
+                            name="courseTitle"
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                             placeholder="e.g., IELTS Preparation"
                             value={newCourseTitle}
@@ -899,6 +910,7 @@ const AdminDashboard = ({ setCurrentPage }) => {
                         <label htmlFor="courseDescription" className="block text-sm font-medium text-gray-700">Course Description</label>
                         <textarea
                             id="courseDescription"
+                            name="courseDescription"
                             rows="4"
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                             placeholder="Describe the course content, objectives, etc."
@@ -911,6 +923,7 @@ const AdminDashboard = ({ setCurrentPage }) => {
                         <label htmlFor="courseExamType" className="block text-sm font-medium text-gray-700">Exam Type</label>
                         <select
                             id="courseExamType"
+                            name="courseExamType"
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                             value={newCourseExamType}
                             onChange={(e) => setNewCourseExamType(e.target.value)}
@@ -983,6 +996,8 @@ const AdminDashboard = ({ setCurrentPage }) => {
                         <form onSubmit={handleCreateModule} className="flex space-x-2">
                             <input
                                 type="text"
+                                id={`newModuleName-${selectedCourse.id}`} // Added ID for accessibility
+                                name={`newModuleName-${selectedCourse.id}`} // Added name for autofill/accessibility
                                 className="flex-grow border border-gray-300 rounded-md p-2"
                                 placeholder="Module Title (e.g., Speaking, Day 1)"
                                 value={newModuleName}
@@ -1023,17 +1038,21 @@ const AdminDashboard = ({ setCurrentPage }) => {
 
                                             <div className="mt-2 space-x-2">
                                                 {/* These are for updating existing lessons with files */}
-                                                <label className="block text-sm font-medium text-gray-700">Upload Video (for this lesson):</label>
+                                                <label htmlFor={`uploadVideo-${lesson.id}`} className="block text-sm font-medium text-gray-700">Upload Video (for this lesson):</label>
                                                 <input
                                                     type="file"
+                                                    id={`uploadVideo-${lesson.id}`} // Added ID for accessibility
+                                                    name={`uploadVideo-${lesson.id}`} // Added name for autofill/accessibility
                                                     accept="video/*"
                                                     onChange={(e) => handleFileUpload(e, lesson.id, 'video')}
                                                     disabled={uploading}
                                                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                                 />
-                                                <label className="block text-sm font-medium text-gray-700 mt-2">Upload Document (for this lesson):</label>
+                                                <label htmlFor={`uploadDocument-${lesson.id}`} className="block text-sm font-medium text-gray-700 mt-2">Upload Document (for this lesson):</label>
                                                 <input
                                                     type="file"
+                                                    id={`uploadDocument-${lesson.id}`} // Added ID for accessibility
+                                                    name={`uploadDocument-${lesson.id}`} // Added name for autofill/accessibility
                                                     accept=".pdf,.doc,.docx,.ppt,.pptx"
                                                     onChange={(e) => handleFileUpload(e, lesson.id, 'document')}
                                                     disabled={uploading}
@@ -1204,6 +1223,8 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
                     <Search size={20} className="text-gray-500 mr-2" />
                     <input
                         type="text"
+                        id="courseSearch" // Added ID for accessibility
+                        name="courseSearch" // Added name for autofill/accessibility
                         placeholder="Search courses (IELTS, PTE, SAT, etc.)..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -1515,12 +1536,13 @@ const ProfilePage = ({ setCurrentPage }) => {
                 <h2 className="text-2xl font-semibold text-gray-700 mb-4">Edit Profile</h2>
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="profileName">
+                        <label htmlFor="profileName" className="block text-gray-700 text-sm font-bold mb-2">
                             Name
                         </label>
                         <input
                             type="text"
-                            id="profileName"
+                            id="profileName" // Added ID for accessibility
+                            name="profileName" // Added name for autofill/accessibility
                             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -1547,12 +1569,13 @@ const ProfilePage = ({ setCurrentPage }) => {
                 <h2 className="text-2xl font-semibold text-gray-700 mb-4">Change Password</h2>
                 <form onSubmit={handleChangePassword} className="space-y-4">
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="newPassword">
+                        <label htmlFor="newPassword" className="block text-gray-700 text-sm font-bold mb-2">
                             New Password
                         </label>
                         <input
                             type="password"
-                            id="newPassword"
+                            id="newPassword" // Added ID for accessibility
+                            name="newPassword" // Added name for autofill/accessibility
                             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
@@ -1560,12 +1583,13 @@ const ProfilePage = ({ setCurrentPage }) => {
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirmNewPassword">
+                        <label htmlFor="confirmNewPassword" className="block text-gray-700 text-sm font-bold mb-2">
                             Confirm New Password
                         </label>
                         <input
                             type="password"
-                            id="confirmNewPassword"
+                            id="confirmNewPassword" // Added ID for accessibility
+                            name="confirmNewPassword" // Added name for autofill/accessibility
                             className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                             value={confirmNewPassword}
                             onChange={(e) => setConfirmNewPassword(e.target.value)}
