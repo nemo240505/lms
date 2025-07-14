@@ -254,8 +254,6 @@ const AuthPage = ({ setCurrentPage }) => {
                 // User successfully created in auth.users
                 console.log('AuthPage: Supabase Auth User created:', data.user); // Log the created user
 
-                // *** CRITICAL CHANGE: Use data.user.id directly for profile insertion ***
-                // Removed the getSession call here as it was causing issues with immediate session availability
                 const userId = data.user.id; // Use the ID directly from the signUp response
                 console.log('AuthPage: User ID from signUp response for profile insert:', userId);
 
@@ -269,14 +267,14 @@ const AuthPage = ({ setCurrentPage }) => {
                 });
 
                 try {
-                    const { error: profileError } = await supabase.from('profiles').insert({
+                    const { data: insertedProfile, error: profileError } = await supabase.from('profiles').insert({
                         id: userId, // Use ID from signUp response
                         email: email,
                         name: name,
                         role: 'student', // Default role for new signups
                         registered_exams: selectedExams, // Save selected exams
-                    });
-                    console.log('AuthPage: Profile insert result - profileError:', profileError);
+                    }).select(); // Added .select() to get the inserted data back
+                    console.log('AuthPage: Profile insert result - insertedProfile:', insertedProfile, 'profileError:', profileError);
 
                     if (profileError) {
                         // Log the error more thoroughly
@@ -284,17 +282,12 @@ const AuthPage = ({ setCurrentPage }) => {
                         setMessage(`Signup successful, but failed to create profile: ${profileError.message || 'Please check Supabase RLS for "profiles" table and schema.'}`);
                     } else {
                         setMessage('Signup successful! Please check your email for verification.');
-                        // Re-fetch profile after successful insert to update context immediately
-                        const { data: newProfile, error: newProfileError } = await supabase
-                            .from('profiles')
-                            .select('*')
-                            .eq('id', userId)
-                            .single();
-                        if (!newProfileError) {
-                            setUserProfile(newProfile);
+                        // Set the newly inserted profile directly into context
+                        if (insertedProfile && insertedProfile.length > 0) {
+                            setUserProfile(insertedProfile[0]);
                             console.log('AuthPage: User profile set in context after successful signup and insert.');
                         } else {
-                            console.error('AuthPage: Error re-fetching profile after successful insert:', newProfileError);
+                            console.warn('AuthPage: Profile insert succeeded, but no data returned. Context might not be fully updated.');
                         }
                     }
                 } catch (insertError) {
