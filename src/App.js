@@ -560,10 +560,26 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             };
             console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
 
-            // Directly await the insert operation
-            console.log('LessonCreationForm: Directly awaiting Supabase insert operation...');
-            const { data, error } = await supabase.from('lessons').insert([lessonDataToInsert]).select();
-            console.log('LessonCreationForm: Supabase insert operation resolved.');
+            // Directly await the insert operation with a timeout
+            const insertPromise = supabase.from('lessons').insert([lessonDataToInsert]).select();
+            const timeoutPromise = new Promise((resolve, reject) =>
+                setTimeout(() => reject(new Error('Supabase insert operation timed out after 30 seconds.')), 30000)
+            );
+
+            console.log('LessonCreationForm: Awaiting Promise.race for insert operation...');
+            const result = await Promise.race([insertPromise, timeoutPromise]);
+            console.log('LessonCreationForm: Promise.race resolved with result:', result);
+
+            // Check if the result is an error from the timeout
+            if (result instanceof Error) {
+                console.error('LessonCreationForm: Timeout error caught:', result.message);
+                setMessage(`Error creating lesson: ${result.message}`);
+                setLoading(false);
+                return;
+            }
+
+            // If it's not a timeout error, it should be the Supabase response
+            const { data, error } = result;
 
             if (error) {
                 console.error('LessonCreationForm: Error creating lesson (details):', error.message || JSON.stringify(error));
