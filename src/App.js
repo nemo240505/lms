@@ -493,6 +493,9 @@ const AdminDashboard = ({ setCurrentPage }) => {
     const [newLessonTitle, setNewLessonTitle] = useState('');
     const [newLessonContent, setNewLessonContent] = useState('');
     const [newLessonType, setNewLessonType] = useState('text');
+    const [newLessonVideoUrl, setNewLessonVideoUrl] = useState(''); // New state for video URL
+    const [newLessonDocumentUrl, setNewLessonDocumentUrl] = useState(''); // New state for document URL
+
     const [uploading, setUploading] = useState(false);
     const [uploadMessage, setUploadMessage] = useState('');
 
@@ -567,7 +570,20 @@ const AdminDashboard = ({ setCurrentPage }) => {
 
     const handleCreateLesson = async (e, moduleId) => {
         e.preventDefault();
-        if (!newLessonTitle || !newLessonContent || !moduleId || !supabase) return;
+        if (!newLessonTitle || !newLessonContent || !moduleId || !supabase) {
+            alert('Please fill lesson title and content.');
+            return;
+        }
+
+        // Determine which URL to save based on lesson type
+        let videoUrlToSave = null;
+        let documentUrlToSave = null;
+
+        if (newLessonType === 'video' && newLessonVideoUrl) {
+            videoUrlToSave = newLessonVideoUrl;
+        } else if (newLessonType === 'document' && newLessonDocumentUrl) {
+            documentUrlToSave = newLessonDocumentUrl;
+        }
 
         const { data, error } = await supabase.from('lessons').insert([
             {
@@ -575,6 +591,8 @@ const AdminDashboard = ({ setCurrentPage }) => {
                 title: newLessonTitle,
                 content: newLessonContent,
                 type: newLessonType,
+                video_url: videoUrlToSave,      // Use the URL if provided
+                document_url: documentUrlToSave, // Use the URL if provided
                 order: 0, // Simplified ordering
             },
         ]).select();
@@ -582,7 +600,9 @@ const AdminDashboard = ({ setCurrentPage }) => {
         else {
             setNewLessonTitle('');
             setNewLessonContent('');
-            setNewLessonType('text');
+            setNewLessonType('text'); // Reset to default
+            setNewLessonVideoUrl(''); // Clear URL fields
+            setNewLessonDocumentUrl('');
             fetchCourseDetails(selectedCourse.id); // Re-fetch all details
         }
     };
@@ -806,7 +826,11 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                                 id={`lessonType-${module.id}`}
                                                 className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                                 value={newLessonType}
-                                                onChange={(e) => setNewLessonType(e.target.value)}
+                                                onChange={(e) => {
+                                                    setNewLessonType(e.target.value);
+                                                    setNewLessonVideoUrl(''); // Clear URLs when type changes
+                                                    setNewLessonDocumentUrl('');
+                                                }}
                                             >
                                                 <option value="text">Text</option>
                                                 <option value="video">Video</option>
@@ -814,6 +838,35 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                                 {/* <option value="quiz">Quiz</option> */}
                                             </select>
                                         </div>
+
+                                        {/* Conditional URL inputs for new lessons */}
+                                        {newLessonType === 'video' && (
+                                            <div>
+                                                <label htmlFor={`newLessonVideoUrl-${module.id}`} className="block text-sm font-medium text-gray-700">Video URL (Optional)</label>
+                                                <input
+                                                    type="url"
+                                                    id={`newLessonVideoUrl-${module.id}`}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                                    placeholder="e.g., https://www.youtube.com/watch?v=..."
+                                                    value={newLessonVideoUrl}
+                                                    onChange={(e) => setNewLessonVideoUrl(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
+                                        {newLessonType === 'document' && (
+                                            <div>
+                                                <label htmlFor={`newLessonDocumentUrl-${module.id}`} className="block text-sm font-medium text-gray-700">Document URL (Optional)</label>
+                                                <input
+                                                    type="url"
+                                                    id={`newLessonDocumentUrl-${module.id}`}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                                    placeholder="e.g., https://example.com/document.pdf"
+                                                    value={newLessonDocumentUrl}
+                                                    onChange={(e) => setNewLessonDocumentUrl(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
+
                                         <button
                                             type="submit"
                                             className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-200"
@@ -830,11 +883,11 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                         <li key={lesson.id} className="border border-gray-100 rounded-md p-3 bg-white">
                                             <p className="font-semibold text-gray-800">{lesson.title} ({lesson.type})</p>
                                             <p className="text-sm text-gray-600 truncate">{lesson.content}</p>
-                                            {lesson.video_url && <p className="text-xs text-blue-500">Video: {lesson.video_url}</p>}
-                                            {lesson.document_url && <p className="text-xs text-blue-500">Doc: {lesson.document_url}</p>}
+                                            {lesson.video_url && <p className="text-xs text-blue-500">Video: <a href={lesson.video_url} target="_blank" rel="noopener noreferrer" className="underline">{lesson.video_url}</a></p>}
+                                            {lesson.document_url && <p className="text-xs text-blue-500">Doc: <a href={lesson.document_url} target="_blank" rel="noopener noreferrer" className="underline">{lesson.document_url}</a></p>}
 
                                             <div className="mt-2 space-x-2">
-                                                <label className="block text-sm font-medium text-gray-700">Upload Video:</label>
+                                                <label className="block text-sm font-medium text-gray-700">Upload Video (for this lesson):</label>
                                                 <input
                                                     type="file"
                                                     accept="video/*"
@@ -842,7 +895,7 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                                     disabled={uploading}
                                                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                                                 />
-                                                <label className="block text-sm font-medium text-gray-700 mt-2">Upload Document:</label>
+                                                <label className="block text-sm font-medium text-gray-700 mt-2">Upload Document (for this lesson):</label>
                                                 <input
                                                     type="file"
                                                     accept=".pdf,.doc,.docx,.ppt,.pptx"
