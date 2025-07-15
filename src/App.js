@@ -6,6 +6,7 @@ import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, Chec
 // Supabase Configuration (replace with your actual values if different)
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
 // IMPORTANT: Replace 'YOUR_ACTUAL_SUPABASE_ANON_PUBLIC_KEY_HERE' with your actual anon public key from Supabase Project Settings -> API
+// You can find this in your Supabase project settings under "API" -> "Project API keys" -> "anon public"
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
 
 // Create a context for Supabase and User data
@@ -1261,6 +1262,7 @@ const CourseView = ({ courseId, setCurrentPage }) => {
     const [selectedLesson, setSelectedLesson] = useState(null);
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState({}); // { lesson_id: completed_status }
+    const [videoLoadError, setVideoLoadError] = useState(false); // New state for video load errors
 
     // Helper to extract YouTube video ID
     const getYouTubeVideoId = (url) => {
@@ -1270,11 +1272,13 @@ const CourseView = ({ courseId, setCurrentPage }) => {
     };
 
     useEffect(() => {
+        // Reset videoLoadError when selectedLesson or courseId changes
+        setVideoLoadError(false); 
         if (courseId && userProfile?.id && supabase) { // Ensure all dependencies are available
             fetchCourseDetails();
             fetchStudentProgress();
         }
-    }, [courseId, userProfile, supabase]); // Depend on supabase client
+    }, [courseId, userProfile, supabase, selectedLesson]); // Depend on supabase client and selectedLesson
 
     const fetchCourseDetails = async () => {
         setLoading(true);
@@ -1406,7 +1410,14 @@ const CourseView = ({ courseId, setCurrentPage }) => {
                             <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">{selectedLesson.title}</h2>
                             {selectedLesson.video_url && (
                                 <div className="mb-4 aspect-video bg-black rounded-lg overflow-hidden">
-                                    {youtubeVideoId ? (
+                                    {videoLoadError ? (
+                                        <div className="flex items-center justify-center h-full text-white text-center p-4 bg-red-800">
+                                            <p>
+                                                Error loading video. It might be due to embedding restrictions (for YouTube) or an inaccessible file (for direct links).
+                                                Please try a different video URL or upload the video directly via the Admin Dashboard.
+                                            </p>
+                                        </div>
+                                    ) : youtubeVideoId ? (
                                         <iframe
                                             className="w-full h-full"
                                             src={`https://www.youtube.com/embed/${youtubeVideoId}`}
@@ -1414,9 +1425,20 @@ const CourseView = ({ courseId, setCurrentPage }) => {
                                             frameBorder="0"
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                             allowFullScreen
+                                            onError={() => {
+                                                console.error("YouTube iframe failed to load.");
+                                                setVideoLoadError(true);
+                                            }}
                                         ></iframe>
                                     ) : (
-                                        <video controls className="w-full h-full">
+                                        <video
+                                            controls
+                                            className="w-full h-full"
+                                            onError={() => {
+                                                console.error("Video tag failed to load.");
+                                                setVideoLoadError(true);
+                                            }}
+                                        >
                                             <source src={selectedLesson.video_url} type="video/mp4" />
                                             Your browser does not support the video tag.
                                         </video>
