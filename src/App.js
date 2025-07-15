@@ -322,8 +322,8 @@ const AuthPage = ({ setCurrentPage }) => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-            <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 sm:p-6">
+            <div className="bg-white p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md">
                 <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
                     {isLogin ? 'Login' : 'Sign Up'}
                 </h2>
@@ -446,33 +446,33 @@ const Header = ({ setCurrentPage }) => {
 
     return (
         <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4 shadow-md flex justify-between items-center rounded-b-lg">
-            <h1 className="text-2xl font-extrabold cursor-pointer" onClick={() => setCurrentPage('home')}>LMS Portal</h1>
-            <nav className="flex items-center space-x-4">
+            <h1 className="text-xl sm:text-2xl font-extrabold cursor-pointer" onClick={() => setCurrentPage('home')}>LMS Portal</h1>
+            <nav className="flex items-center space-x-2 sm:space-x-4">
                 {userProfile && (
-                    <span className="text-lg font-medium">Hello, {userProfile.name || userProfile.email}!</span>
+                    <span className="text-sm sm:text-lg font-medium truncate max-w-[100px] sm:max-w-none">Hello, {userProfile.name || userProfile.email}!</span>
                 )}
                 <button
                     onClick={() => setCurrentPage('home')}
-                    className="flex items-center space-x-1 p-2 rounded-md hover:bg-blue-700 transition-colors"
+                    className="flex items-center space-x-1 p-1 sm:p-2 rounded-md hover:bg-blue-700 transition-colors"
                 >
-                    <Home size={20} />
-                    <span>Home</span>
+                    <Home size={18} className="sm:size-20" />
+                    <span className="hidden sm:inline">Home</span>
                 </button>
                 {userProfile && (
                     <>
                         <button
                             onClick={() => setCurrentPage('profile')}
-                            className="flex items-center space-x-1 p-2 rounded-md hover:bg-blue-700 transition-colors"
+                            className="flex items-center space-x-1 p-1 sm:p-2 rounded-md hover:bg-blue-700 transition-colors"
                         >
-                            <User size={20} />
-                            <span>Profile</span>
+                            <User size={18} className="sm:size-20" />
+                            <span className="hidden sm:inline">Profile</span>
                         </button>
                         <button
                             onClick={handleLogout}
-                            className="flex items-center space-x-1 p-2 rounded-md hover:bg-blue-700 transition-colors bg-red-500 hover:bg-red-600"
+                            className="flex items-center space-x-1 p-1 sm:p-2 rounded-md hover:bg-blue-700 transition-colors bg-red-500 hover:bg-red-600"
                         >
-                            <LogOut size={20} />
-                            <span>Logout</span>
+                            <LogOut size={18} className="sm:size-20" />
+                            <span className="hidden sm:inline">Logout</span>
                         </button>
                     </>
                 )}
@@ -880,13 +880,13 @@ const AdminDashboard = ({ setCurrentPage }) => {
     };
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin Dashboard</h1>
+        <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Admin Dashboard</h1>
 
             {/* Course Creation */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4">Create New Course</h2>
-                <form onSubmit={handleCreateCourse} className="space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6 sm:mb-8">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Create New Course</h2>
+                <form onSubmit={handleCreateCourse} className="space-y-3 sm:space-y-4">
                     <div>
                         <label htmlFor="courseTitle" className="block text-sm font-medium text-gray-700">Course Title</label>
                         <input
@@ -940,20 +940,20 @@ const AdminDashboard = ({ setCurrentPage }) => {
             </div>
 
             {/* Existing Courses List */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4">Manage Existing Courses</h2>
-                <ul className="space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6 sm:mb-8">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Manage Existing Courses</h2>
+                <ul className="space-y-3 sm:space-y-4">
                     {courses.map((course) => (
-                        <li key={course.id} className="border border-gray-200 rounded-md p-4 flex justify-between items-center bg-gray-50">
-                            <div>
-                                <h3 className="text-xl font-bold text-gray-800">{course.title}</h3>
-                                <p className="text-sm text-gray-600">Status: {course.published ? 'Published' : 'Draft'}</p>
-                                <p className="text-sm text-gray-600">Exam: {course.exam_type || 'N/A'}</p>
+                        <li key={course.id} className="border border-gray-200 rounded-md p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50">
+                            <div className="mb-2 sm:mb-0">
+                                <h3 className="text-lg sm:text-xl font-bold text-gray-800">{course.title}</h3>
+                                <p className="text-xs sm:text-sm text-gray-600">Status: {course.published ? 'Published' : 'Draft'}</p>
+                                <p className="text-xs sm:text-sm text-gray-600">Exam: {course.exam_type || 'N/A'}</p>
                             </div>
-                            <div className="space-x-2">
+                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                                 <button
                                     onClick={() => handlePublishToggle(course.id, course.published)}
-                                    className={`py-1 px-3 rounded-md text-white font-medium transition duration-200 ${
+                                    className={`py-1 px-3 rounded-md text-white font-medium transition duration-200 w-full sm:w-auto ${
                                         course.published ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-500 hover:bg-blue-600'
                                     }`}
                                 >
@@ -961,7 +961,7 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                 </button>
                                 <button
                                     onClick={() => fetchCourseDetails(course.id)}
-                                    className="py-1 px-3 rounded-md bg-purple-500 hover:bg-purple-600 text-white font-medium transition duration-200"
+                                    className="py-1 px-3 rounded-md bg-purple-500 hover:bg-purple-600 text-white font-medium transition duration-200 w-full sm:w-auto"
                                 >
                                     Edit Content
                                 </button>
@@ -973,21 +973,21 @@ const AdminDashboard = ({ setCurrentPage }) => {
 
             {/* Course Content Editor (Modules & Lessons) */}
             {selectedCourse && (
-                <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                    <h2 className="text-2xl font-semibold text-gray-700 mb-4">
+                <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6 sm:mb-8">
+                    <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">
                         Editing Course: {selectedCourse.title}
                         <button
                             onClick={() => setSelectedCourse(null)}
-                            className="ml-4 text-sm text-blue-500 hover:text-blue-700"
+                            className="ml-2 sm:ml-4 text-sm text-blue-500 hover:text-blue-700"
                         >
                             (Close Editor)
                         </button>
                     </h2>
 
                     {/* Add Module */}
-                    <div className="border border-dashed border-gray-300 p-4 rounded-md mb-6">
-                        <h3 className="text-xl font-medium text-gray-700 mb-3">Add New Module</h3>
-                        <form onSubmit={handleCreateModule} className="flex space-x-2">
+                    <div className="border border-dashed border-gray-300 p-4 rounded-md mb-4 sm:mb-6">
+                        <h3 className="text-lg sm:text-xl font-medium text-gray-700 mb-2 sm:mb-3">Add New Module</h3>
+                        <form onSubmit={handleCreateModule} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                             <input
                                 type="text"
                                 id={`newModuleName-${selectedCourse.id}`} // Added ID for accessibility
@@ -1008,10 +1008,10 @@ const AdminDashboard = ({ setCurrentPage }) => {
                     </div>
 
                     {/* List Modules and Lessons */}
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                         {selectedCourse.modules && selectedCourse.modules.map((module) => (
                             <div key={module.id} className="border border-gray-200 rounded-md p-4 bg-gray-50">
-                                <h3 className="text-xl font-bold text-gray-800 mb-3">{module.title}</h3>
+                                <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-3">{module.title}</h3>
 
                                 {/* Add Lesson Form (now a separate component) */}
                                 <LessonCreationForm
@@ -1021,7 +1021,7 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                 />
 
                                 {/* Lessons in Module */}
-                                <h4 className="text-lg font-medium text-gray-700 mb-2">Lessons:</h4>
+                                <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-2">Lessons:</h4>
                                 <ul className="space-y-2">
                                     {module.lessons && module.lessons.map((lesson) => (
                                         <li key={lesson.id} className="border border-gray-100 rounded-md p-3 bg-white">
@@ -1030,28 +1030,32 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                             {lesson.video_url && <p className="text-xs text-blue-500">Video: <a href={lesson.video_url} target="_blank" rel="noopener noreferrer" className="underline">{lesson.video_url}</a></p>}
                                             {lesson.document_url && <p className="text-xs text-blue-500">Doc: <a href={lesson.document_url} target="_blank" rel="noopener noreferrer" className="underline">{lesson.document_url}</a></p>}
 
-                                            <div className="mt-2 space-x-2">
+                                            <div className="mt-2 space-y-2">
                                                 {/* These are for updating existing lessons with files */}
-                                                <label htmlFor={`uploadVideo-${lesson.id}`} className="block text-sm font-medium text-gray-700">Upload Video (for this lesson):</label>
-                                                <input
-                                                    type="file"
-                                                    id={`uploadVideo-${lesson.id}`} // Added ID for accessibility
-                                                    name={`uploadVideo-${lesson.id}`} // Added name for autofill/accessibility
-                                                    accept="video/*"
-                                                    onChange={(e) => handleFileUpload(e, lesson.id, 'video')}
-                                                    disabled={uploading}
-                                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                                />
-                                                <label htmlFor={`uploadDocument-${lesson.id}`} className="block text-sm font-medium text-gray-700 mt-2">Upload Document (for this lesson):</label>
-                                                <input
-                                                    type="file"
-                                                    id={`uploadDocument-${lesson.id}`} // Added ID for accessibility
-                                                    name={`uploadDocument-${lesson.id}`} // Added name for autofill/accessibility
-                                                    accept=".pdf,.doc,.docx,.ppt,.pptx"
-                                                    onChange={(e) => handleFileUpload(e, lesson.id, 'document')}
-                                                    disabled={uploading}
-                                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                                />
+                                                <div>
+                                                    <label htmlFor={`uploadVideo-${lesson.id}`} className="block text-sm font-medium text-gray-700">Upload Video (for this lesson):</label>
+                                                    <input
+                                                        type="file"
+                                                        id={`uploadVideo-${lesson.id}`} // Added ID for accessibility
+                                                        name={`uploadVideo-${lesson.id}`} // Added name for autofill/accessibility
+                                                        accept="video/*"
+                                                        onChange={(e) => handleFileUpload(e, lesson.id, 'video')}
+                                                        disabled={uploading}
+                                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label htmlFor={`uploadDocument-${lesson.id}`} className="block text-sm font-medium text-gray-700 mt-2">Upload Document (for this lesson):</label>
+                                                    <input
+                                                        type="file"
+                                                        id={`uploadDocument-${lesson.id}`} // Added ID for accessibility
+                                                        name={`uploadDocument-${lesson.id}`} // Added name for autofill/accessibility
+                                                        accept=".pdf,.doc,.docx,.ppt,.pptx"
+                                                        onChange={(e) => handleFileUpload(e, lesson.id, 'document')}
+                                                        disabled={uploading}
+                                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                                    />
+                                                </div>
                                                 {uploading && <p className="text-blue-600 text-sm mt-1">{uploadMessage}</p>}
                                             </div>
                                         </li>
@@ -1179,23 +1183,23 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
         setCurrentPage('courseView');
     };
 
-    if (loadingCourses) return <div className="p-6 text-center">Loading courses...</div>;
+    if (loadingCourses) return <div className="p-4 sm:p-6 text-center">Loading courses...</div>;
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">Student Dashboard</h1>
+        <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Student Dashboard</h1>
 
             {/* Enrolled Courses */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4">Your Enrolled Courses</h2>
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6 sm:mb-8">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Your Enrolled Courses</h2>
                 {enrolledCourses.length === 0 ? (
-                    <p className="text-gray-600">You are not enrolled in any courses yet or no courses match your registered exams. Discover new courses below!</p>
+                    <p className="text-gray-600 text-sm sm:text-base">You are not enrolled in any courses yet or no courses match your registered exams. Discover new courses below!</p>
                 ) : (
                     <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {enrolledCourses.map((course) => (
                             <li key={course.id} className="border border-blue-200 rounded-lg p-4 bg-blue-50 shadow-sm hover:shadow-md transition-shadow">
-                                <h3 className="text-xl font-bold text-blue-800 mb-2">{course.title}</h3>
-                                <p className="text-sm text-gray-600 mb-1">Exam Type: {course.exam_type || 'N/A'}</p>
+                                <h3 className="text-lg sm:text-xl font-bold text-blue-800 mb-2">{course.title}</h3>
+                                <p className="text-xs sm:text-sm text-gray-600 mb-1">Exam Type: {course.exam_type || 'N/A'}</p>
                                 <div className="text-gray-700 text-sm mb-3 line-clamp-3" dangerouslySetInnerHTML={{ __html: course.description }} />
                                 <button
                                     onClick={() => handleViewCourse(course.id)}
@@ -1211,8 +1215,8 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
             </div>
 
             {/* Course Discovery */}
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4">Discover Courses</h2>
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Discover Courses</h2>
                 <div className="mb-4 flex items-center border border-gray-300 rounded-md shadow-sm p-2">
                     <Search size={20} className="text-gray-500 mr-2" />
                     <input
@@ -1226,13 +1230,13 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
                     />
                 </div>
                 {filteredAvailableCourses.length === 0 ? (
-                    <p className="text-gray-600">No new courses available matching your search or registered exams.</p>
+                    <p className="text-gray-600 text-sm sm:text-base">No new courses available matching your search or registered exams.</p>
                 ) : (
                     <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredAvailableCourses.map((course) => (
                             <li key={course.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50 shadow-sm hover:shadow-md transition-shadow">
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">{course.title}</h3>
-                                <p className="text-sm text-gray-600 mb-1">Exam Type: {course.exam_type || 'N/A'}</p>
+                                <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-2">{course.title}</h3>
+                                <p className="text-xs sm:text-sm text-gray-600 mb-1">Exam Type: {course.exam_type || 'N/A'}</p>
                                 <div className="text-gray-700 text-sm mb-3 line-clamp-3" dangerouslySetInnerHTML={{ __html: course.description }} />
                                 <button
                                     onClick={() => handleEnroll(course.id)}
@@ -1245,6 +1249,204 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
                         ))}
                     </ul>
                 )}
+            </div>
+        </div>
+    );
+};
+
+// Course View Page (Student)
+const CourseView = ({ courseId, setCurrentPage }) => {
+    const { supabase, userProfile } = useContext(AppContext);
+    const [course, setCourse] = useState(null);
+    const [selectedLesson, setSelectedLesson] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [progress, setProgress] = useState({}); // { lesson_id: completed_status }
+
+    // Helper to extract YouTube video ID
+    const getYouTubeVideoId = (url) => {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    };
+
+    useEffect(() => {
+        if (courseId && userProfile?.id && supabase) { // Ensure all dependencies are available
+            fetchCourseDetails();
+            fetchStudentProgress();
+        }
+    }, [courseId, userProfile, supabase]); // Depend on supabase client
+
+    const fetchCourseDetails = async () => {
+        setLoading(true);
+        if (!supabase) return;
+        const { data: courseData, error: courseError } = await supabase
+            .from('courses')
+            .select('*, modules(*, lessons(*))')
+            .eq('id', courseId)
+            .order('order', { foreignTable: 'modules', ascending: true })
+            .order('order', { foreignTable: 'modules.lessons', ascending: true })
+            .single();
+
+        if (courseError) {
+            console.error('Error fetching course:', courseError);
+            alert('Course not found or access denied.');
+            setCurrentPage('studentDashboard');
+            setLoading(false);
+            return;
+        }
+        setCourse(courseData);
+
+        // Set the first lesson as selected by default if available
+        if (courseData.modules && courseData.modules.length > 0 && courseData.modules[0].lessons && courseData.modules[0].lessons.length > 0) {
+            setSelectedLesson(courseData.modules[0].lessons[0]);
+        }
+        setLoading(false);
+    };
+
+    const fetchStudentProgress = async () => {
+        if (!supabase || !userProfile?.id) return;
+        const { data, error } = await supabase
+            .from('progress')
+            .select('*')
+            .eq('student_id', userProfile.id)
+            .eq('course_id', courseId); // Filter by course_id for efficiency
+
+        if (error) {
+            console.error('Error fetching progress:', error);
+            return;
+        }
+        const progressMap = data.reduce((acc, item) => {
+            acc[item.lesson_id] = item.completed;
+            return acc;
+        }, {});
+        setProgress(progressMap);
+    };
+
+    const handleLessonCompleteToggle = async (lessonId, currentStatus) => {
+        if (!supabase || !userProfile?.id) return;
+        const { error } = await supabase.from('progress').upsert(
+            {
+                student_id: userProfile.id,
+                course_id: courseId, // Store course_id for easier querying
+                lesson_id: lessonId,
+                completed: !currentStatus,
+                last_viewed_at: new Date().toISOString(),
+            },
+            { onConflict: ['student_id', 'lesson_id'] } // Update if already exists
+        );
+        if (error) console.error('Error updating progress:', error);
+        else fetchStudentProgress(); // Refresh progress
+    };
+
+    const handleDownload = async (url, filename) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+            console.error('Error downloading file:', error);
+            alert('Failed to download file.');
+        }
+    };
+
+    if (loading) return <div className="p-4 sm:p-6 text-center">Loading course content...</div>;
+    if (!course) return <div className="p-4 sm:p-6 text-center text-red-600">Course not found or access denied.</div>;
+
+    const youtubeVideoId = selectedLesson?.video_url ? getYouTubeVideoId(selectedLesson.video_url) : null;
+
+    return (
+        <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4">Course: {course.title}</h1>
+            <button
+                onClick={() => setCurrentPage('studentDashboard')}
+                className="mb-4 sm:mb-6 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-md transition duration-200"
+            >
+                Back to Dashboard
+            </button>
+
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+                {/* Modules & Lessons Sidebar */}
+                <div className="lg:w-1/4 bg-white p-4 sm:p-6 rounded-lg shadow-md">
+                    <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Course Content</h2>
+                    <nav className="space-y-3 sm:space-y-4">
+                        {course.modules && course.modules.map((module) => (
+                            <div key={module.id}>
+                                <h3 className="text-lg sm:text-xl font-bold text-blue-700 mb-1 sm:mb-2">{module.title}</h3>
+                                <ul className="space-y-1 sm:space-y-2 pl-3 sm:pl-4">
+                                    {module.lessons && module.lessons.map((lesson) => (
+                                        <li
+                                            key={lesson.id}
+                                            onClick={() => setSelectedLesson(lesson)}
+                                            className={`cursor-pointer p-2 rounded-md transition-colors flex items-center space-x-2
+                                                ${selectedLesson?.id === lesson.id ? 'bg-blue-100 text-blue-800 font-semibold' : 'hover:bg-gray-100 text-gray-700'}
+                                                ${progress[lesson.id] ? 'text-green-700' : ''}
+                                            `}
+                                        >
+                                            {progress[lesson.id] && <CheckCircle size={16} className="text-green-500" />}
+                                            <span className="text-sm sm:text-base">{lesson.title}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </nav>
+                </div>
+
+                {/* Lesson Content Area */}
+                <div className="lg:w-3/4 bg-white p-4 sm:p-6 rounded-lg shadow-md">
+                    {selectedLesson ? (
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">{selectedLesson.title}</h2>
+                            {selectedLesson.video_url && (
+                                <div className="mb-4 aspect-video bg-black rounded-lg overflow-hidden">
+                                    {youtubeVideoId ? (
+                                        <iframe
+                                            className="w-full h-full"
+                                            src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+                                            title="YouTube video player"
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        ></iframe>
+                                    ) : (
+                                        <video controls className="w-full h-full">
+                                            <source src={selectedLesson.video_url} type="video/mp4" />
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    )}
+                                </div>
+                            )}
+                            <div className="prose max-w-none mb-4 sm:mb-6 text-gray-700 text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: selectedLesson.content }} />
+                            {selectedLesson.document_url && (
+                                <button
+                                    onClick={() => handleDownload(selectedLesson.document_url, `${selectedLesson.title}.pdf`)}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center space-x-2 mb-4"
+                                >
+                                    <Download size={20} />
+                                    <span>Download Document</span>
+                                </button>
+                            )}
+                            <button
+                                onClick={() => handleLessonCompleteToggle(selectedLesson.id, progress[selectedLesson.id])}
+                                className={`py-2 px-4 rounded-md font-bold transition duration-200 flex items-center space-x-2 ${
+                                    progress[selectedLesson.id] ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
+                                }`}
+                            >
+                                <CheckCircle size={20} />
+                                <span>{progress[selectedLesson.id] ? 'Mark as Incomplete' : 'Mark as Complete'}</span>
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="text-gray-600 text-center py-6 sm:py-10 text-sm sm:text-base">Select a lesson from the left to view its content.</p>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -1325,12 +1527,12 @@ const ProfilePage = ({ setCurrentPage }) => {
     };
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">Your Profile</h1>
+        <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Your Profile</h1>
 
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4">Edit Profile</h2>
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6 sm:mb-8">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Edit Profile</h2>
+                <form onSubmit={handleUpdateProfile} className="space-y-3 sm:space-y-4">
                     <div>
                         <label htmlFor="profileName" className="block text-gray-700 text-sm font-bold mb-2">
                             Name
@@ -1361,9 +1563,9 @@ const ProfilePage = ({ setCurrentPage }) => {
                 </form>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4">Change Password</h2>
-                <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Change Password</h2>
+                <form onSubmit={handleChangePassword} className="space-y-3 sm:space-y-4">
                     <div>
                         <label htmlFor="newPassword" className="block text-gray-700 text-sm font-bold mb-2">
                             New Password
