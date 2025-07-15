@@ -7,7 +7,7 @@ import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, Chec
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
 // IMPORTANT: Replace 'YOUR_ACTUAL_SUPABASE_ANON_PUBLIC_KEY_HERE' with your actual anon public key from Supabase Project Settings -> API
 // You can find this in your Supabase project settings under "API" -> "Project API keys" -> "anon public"
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptbnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
 
 // Create a context for Supabase and User data
 const AppContext = createContext();
@@ -157,7 +157,8 @@ const AppProvider = ({ children }) => {
 
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient})`);
+    // Added a version identifier to the log
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.2]`);
 
 
     return (
@@ -510,6 +511,8 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
         let finalVideoUrl = newLessonVideoUrl;
         let finalDocumentUrl = newLessonDocumentUrl;
 
+        console.log('LessonCreationForm: Entering try block for lesson insert.'); // New log before try
+
         try {
             // Handle video file upload if provided
             if (newLessonType === 'video' && newLessonVideoFile) {
@@ -562,9 +565,10 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
 
             // Directly await the insert operation
-            console.log('LessonCreationForm: Sending insert request to Supabase...');
+            console.log('LessonCreationForm: Attempting Supabase insert...'); // This is the log we need to see!
+            console.log('LessonCreationForm: Supabase client object for insert:', supabase); // New: Log the client
             const { data, error } = await supabase.from('lessons').insert([lessonDataToInsert]).select();
-            console.log('LessonCreationForm: Supabase insert response received.');
+            console.log('LessonCreationForm: Supabase insert call completed.'); // This is also NOT appearing
 
             if (error) {
                 console.error('LessonCreationForm: Error creating lesson (details):', error.message || JSON.stringify(error));
@@ -583,7 +587,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 fetchCourseDetails(); // Trigger a re-fetch of course details in AdminDashboard
             }
         } catch (insertError) {
-            console.error('LessonCreationForm: Unexpected error during lesson insert/upload:', insertError);
+            console.error('LessonCreationForm: !!! CAUGHT UNEXPECTED ERROR during lesson insert/upload:', insertError); // Enhanced log
             setMessage(`An unexpected error occurred: ${insertError.message}`);
         } finally {
             setLoading(false);
