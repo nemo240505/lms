@@ -158,7 +158,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.5]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.6]`);
 
 
     return (
@@ -567,17 +567,27 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             // Directly await the insert operation
             console.log('LessonCreationForm: Attempting Supabase insert using supabase-js client...'); // This is the log we need to see!
             console.log('LessonCreationForm: Supabase client object for insert:', supabase); // New: Log the client
-            // Changed .select() to { returning: 'minimal' } to avoid RLS issues on SELECT
-            const { data, error } = await supabase.from('lessons').insert([lessonDataToInsert], { returning: 'minimal' });
-            // NEW LOG ADDED HERE
-            console.log('LessonCreationForm: Supabase insert operation returned:', data, error);
+            
+            // Start of new try/catch for granular error logging
+            let insertResult;
+            try {
+                insertResult = await supabase.from('lessons').insert([lessonDataToInsert], { returning: 'minimal' });
+                console.log('LessonCreationForm: Supabase insert operation returned:', insertResult.data, insertResult.error);
+            } catch (insertCallError) {
+                console.error('LessonCreationForm: ERROR CAUGHT DIRECTLY FROM INSERT CALL:', insertCallError);
+                setMessage(`Error during lesson insert: ${insertCallError.message}`);
+                setLoading(false);
+                return; // Exit if the insert call itself throws an error
+            }
+            // End of new try/catch for granular error logging
+
             console.log('LessonCreationForm: Supabase insert call completed.'); 
 
-            if (error) {
-                console.error('LessonCreationForm: Error creating lesson (details):', error.message || JSON.stringify(error));
-                setMessage(`Error creating lesson: ${error.message || 'Unknown error. Check console.'}`);
+            if (insertResult.error) {
+                console.error('LessonCreationForm: Error creating lesson (details):', insertResult.error.message || JSON.stringify(insertResult.error));
+                setMessage(`Error creating lesson: ${insertResult.error.message || 'Unknown error. Check console.'}`);
             } else {
-                console.log('LessonCreationForm: Lesson created successfully. Data:', data);
+                console.log('LessonCreationForm: Lesson created successfully. Data:', insertResult.data);
                 setMessage('Lesson created successfully!');
                 setNewLessonTitle('');
                 setNewLessonContent('');
@@ -589,9 +599,9 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 // onLessonCreate(data[0]); // Data will be null with returning: 'minimal', so skip this or adjust
                 fetchCourseDetails(); // Trigger a re-fetch of course details in AdminDashboard
             }
-        } catch (insertError) {
-            console.error('LessonCreationForm: !!! CAUGHT UNEXPECTED ERROR during lesson insert/upload:', insertError); // Enhanced log
-            setMessage(`An unexpected error occurred: ${insertError.message}`);
+        } catch (outerCatchError) { // This catches any errors from file uploads or other parts of the try block
+            console.error('LessonCreationForm: !!! CAUGHT UNEXPECTED OUTER ERROR during lesson creation:', outerCatchError); // Enhanced log
+            setMessage(`An unexpected error occurred: ${outerCatchError.message}`);
         } finally {
             setLoading(false);
             console.log('LessonCreationForm: Lesson creation process finished.');
