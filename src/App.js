@@ -97,8 +97,12 @@ const AppProvider = ({ children }) => {
                         console.error('AppProvider: Error fetching profile:', profileError);
                         setUserProfile(null);
                     } else { // Profile found
+                        // Ensure registered_exams is always an array
+                        setUserProfile({
+                            ...profile,
+                            registered_exams: profile.registered_exams || []
+                        });
                         console.log('AppProvider: Profile fetched:', profile);
-                        setUserProfile(profile);
                     }
                 } else {
                     console.log('AppProvider: No session found, user is logged out.');
@@ -135,8 +139,12 @@ const AppProvider = ({ children }) => {
                             console.error('AppProvider: Error fetching profile on auth change:', profileError);
                             setUserProfile(null);
                         } else {
+                            // Ensure registered_exams is always an array
+                            setUserProfile({
+                                ...profile,
+                                registered_exams: profile.registered_exams || []
+                            });
                             console.log('AppProvider: Profile fetched on auth change:', profile);
-                            setUserProfile(profile);
                         }
                     } else {
                         console.log('AppProvider: No session on auth change, user is logged out.');
@@ -158,7 +166,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.8]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.9]`);
 
 
     return (
@@ -230,7 +238,11 @@ const AuthPage = ({ setCurrentPage }) => {
                     console.error('AuthPage: Error fetching profile after login:', profileError);
                     setUserProfile(null);
                 } else { // Profile found
-                    setUserProfile(profile);
+                    // Ensure registered_exams is always an array
+                    setUserProfile({
+                        ...profile,
+                        registered_exams: profile.registered_exams || []
+                    });
                 }
                 setMessage('Logged in successfully!');
             }
@@ -287,7 +299,11 @@ const AuthPage = ({ setCurrentPage }) => {
                         setMessage('Signup successful! Please check your email for verification.');
                         // Set the newly inserted profile directly into context
                         if (insertedProfile && insertedProfile.length > 0) {
-                            setUserProfile(insertedProfile[0]);
+                            // Ensure registered_exams is always an array
+                            setUserProfile({
+                                ...insertedProfile[0],
+                                registered_exams: insertedProfile[0].registered_exams || []
+                            });
                             console.log('AuthPage: User profile set in context after successful signup and insert.');
                         } else {
                             console.warn('AuthPage: Profile insert succeeded, but no data returned. Context might not be fully updated.');
@@ -1541,7 +1557,8 @@ const ProfilePage = ({ setCurrentPage }) => {
         if (error) {
             setMessage(`Error updating profile: ${error.message}`);
         } else {
-            setUserProfile({ ...userProfile, name: name }); // Update context
+            // Ensure registered_exams is always an array when updating context
+            setUserProfile({ ...userProfile, name: name, registered_exams: userProfile.registered_exams || [] }); 
             setMessage('Profile updated successfully!');
         }
         setLoading(false);
