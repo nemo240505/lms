@@ -98,11 +98,17 @@ const AppProvider = ({ children }) => {
                         setUserProfile(null);
                     } else { // Profile found
                         // Ensure registered_exams is always an array
-                        setUserProfile({
+                        const newProfileData = {
                             ...profile,
                             registered_exams: profile.registered_exams || []
-                        });
-                        console.log('AppProvider: Profile fetched:', profile);
+                        };
+                        // Deep comparison to prevent unnecessary re-renders
+                        if (JSON.stringify(newProfileData) !== JSON.stringify(userProfile)) {
+                            setUserProfile(newProfileData);
+                            console.log('AppProvider: User profile updated in context.');
+                        } else {
+                            console.log('AppProvider: User profile data unchanged, skipping update.');
+                        }
                     }
                 } else {
                     console.log('AppProvider: No session found, user is logged out.');
@@ -140,11 +146,17 @@ const AppProvider = ({ children }) => {
                             setUserProfile(null);
                         } else {
                             // Ensure registered_exams is always an array
-                            setUserProfile({
+                            const newProfileData = {
                                 ...profile,
                                 registered_exams: profile.registered_exams || []
-                            });
-                            console.log('AppProvider: Profile fetched on auth change:', profile);
+                            };
+                            // Deep comparison to prevent unnecessary re-renders
+                            if (JSON.stringify(newProfileData) !== JSON.stringify(userProfile)) {
+                                setUserProfile(newProfileData);
+                                console.log('AppProvider: User profile updated in context (auth change).');
+                            } else {
+                                console.log('AppProvider: User profile data unchanged on auth change, skipping update.');
+                            }
                         }
                     } else {
                         console.log('AppProvider: No session on auth change, user is logged out.');
@@ -161,12 +173,12 @@ const AppProvider = ({ children }) => {
                 authListener.data.subscription.unsubscribe();
             }
         };
-    }, [supabaseClient]); // Depend on supabaseClient state
+    }, [supabaseClient, userProfile]); // Depend on supabaseClient state and userProfile for comparison
 
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.10]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.12]`);
 
 
     return (
@@ -1318,7 +1330,7 @@ const CourseView = ({ courseId, setCurrentPage }) => {
             fetchCourseDetails();
             fetchStudentProgress();
         }
-    }, [courseId, userProfile, supabase, selectedLesson]); // Depend on supabase client and selectedLesson
+    }, [courseId, userProfile?.id, supabase]); // Removed selectedLesson from dependencies
 
     const fetchCourseDetails = async () => {
         setLoading(true);
@@ -1342,7 +1354,11 @@ const CourseView = ({ courseId, setCurrentPage }) => {
 
         // Set the first lesson as selected by default if available
         if (courseData.modules && courseData.modules.length > 0 && courseData.modules[0].lessons && courseData.modules[0].lessons.length > 0) {
-            setSelectedLesson(courseData.modules[0].lessons[0]);
+            const firstLesson = courseData.modules[0].lessons[0];
+            // Only update selectedLesson if it's different to prevent re-render loop
+            if (!selectedLesson || selectedLesson.id !== firstLesson.id) {
+                setSelectedLesson(firstLesson);
+            }
         }
         setLoading(false);
     };
