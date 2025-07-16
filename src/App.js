@@ -158,7 +158,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.6]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.7]`);
 
 
     return (
@@ -564,22 +564,28 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             };
             console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
 
-            // Directly await the insert operation
-            console.log('LessonCreationForm: Attempting Supabase insert using supabase-js client...'); // This is the log we need to see!
-            console.log('LessonCreationForm: Supabase client object for insert:', supabase); // New: Log the client
+            // Define a timeout promise
+            const timeout = new Promise((resolve, reject) => {
+                const id = setTimeout(() => {
+                    clearTimeout(id);
+                    reject(new Error('Supabase insert operation timed out after 10 seconds.'));
+                }, 10000); // 10 seconds timeout
+            });
             
-            // Start of new try/catch for granular error logging
             let insertResult;
             try {
-                insertResult = await supabase.from('lessons').insert([lessonDataToInsert], { returning: 'minimal' });
+                // Use Promise.race to race the insert operation against the timeout
+                insertResult = await Promise.race([
+                    supabase.from('lessons').insert([lessonDataToInsert], { returning: 'minimal' }),
+                    timeout
+                ]);
                 console.log('LessonCreationForm: Supabase insert operation returned:', insertResult.data, insertResult.error);
             } catch (insertCallError) {
-                console.error('LessonCreationForm: ERROR CAUGHT DIRECTLY FROM INSERT CALL:', insertCallError);
+                console.error('LessonCreationForm: ERROR CAUGHT DIRECTLY FROM INSERT CALL (or timeout):', insertCallError);
                 setMessage(`Error during lesson insert: ${insertCallError.message}`);
                 setLoading(false);
-                return; // Exit if the insert call itself throws an error
+                return; // Exit if the insert call itself throws an error or times out
             }
-            // End of new try/catch for granular error logging
 
             console.log('LessonCreationForm: Supabase insert call completed.'); 
 
