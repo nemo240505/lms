@@ -7,7 +7,7 @@ import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, Chec
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
 // IMPORTANT: Replace 'YOUR_ACTUAL_SUPABASE_ANON_PUBLIC_KEY_HERE' with your actual anon public key from Supabase Project Settings -> API
 // You can find this in your Supabase project settings under "API" -> "Project API keys" -> "anon public"
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptbnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
 
 // Create a context for Supabase and User data
 const AppContext = createContext();
@@ -158,7 +158,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.2]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.3]`);
 
 
     return (
@@ -485,7 +485,7 @@ const Header = ({ setCurrentPage }) => {
 
 // Lesson Creation Form Component
 const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) => {
-    const { supabase } = useContext(AppContext);
+    const { supabase, session } = useContext(AppContext); // Also get session for direct fetch
     const [newLessonTitle, setNewLessonTitle] = useState('');
     const [newLessonContent, setNewLessonContent] = useState('');
     const [newLessonType, setNewLessonType] = useState('text');
@@ -565,7 +565,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
 
             // Directly await the insert operation
-            console.log('LessonCreationForm: Attempting Supabase insert...'); // This is the log we need to see!
+            console.log('LessonCreationForm: Attempting Supabase insert using supabase-js client...'); // This is the log we need to see!
             console.log('LessonCreationForm: Supabase client object for insert:', supabase); // New: Log the client
             const { data, error } = await supabase.from('lessons').insert([lessonDataToInsert]).select();
             console.log('LessonCreationForm: Supabase insert call completed.'); // This is also NOT appearing
@@ -594,6 +594,72 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             console.log('LessonCreationForm: Lesson creation process finished.');
         }
     };
+
+    // New function for direct fetch test
+    const testDirectInsert = async () => {
+        setLoading(true);
+        setMessage('Testing direct insert...');
+        console.log('LessonCreationForm: Starting direct fetch test...');
+
+        if (!session?.access_token) {
+            setMessage('Not authenticated. Please log in to test direct insert.');
+            setLoading(false);
+            return;
+        }
+
+        const testLessonData = {
+            module_id: moduleId,
+            title: 'Direct Test Lesson ' + Date.now(),
+            content: 'This lesson was inserted using a direct fetch call.',
+            type: 'text',
+            order: 999,
+        };
+
+        try {
+            console.log('LessonCreationForm: Direct fetch - URL:', `${supabaseUrl}/rest/v1/lessons`);
+            console.log('LessonCreationForm: Direct fetch - Payload:', testLessonData);
+            console.log('LessonCreationForm: Direct fetch - Headers (Authorization):', `Bearer ${session.access_token}`);
+            console.log('LessonCreationForm: Direct fetch - Headers (apikey):', supabaseAnonKey);
+
+
+            const response = await fetch(`${supabaseUrl}/rest/v1/lessons`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`, // Use authenticated session token
+                    'apikey': supabaseAnonKey, // Supabase requires this header
+                },
+                body: JSON.stringify(testLessonData),
+            });
+
+            console.log('LessonCreationForm: Direct fetch - Response received.');
+            const responseText = await response.text(); // Get raw text first
+            console.log('LessonCreationForm: Direct fetch - Raw Response Text:', responseText);
+
+            if (!response.ok) {
+                let errorDetails = responseText;
+                try {
+                    const errorJson = JSON.parse(responseText);
+                    errorDetails = errorJson.message || JSON.stringify(errorJson);
+                } catch (parseError) {
+                    // Not JSON, use raw text
+                }
+                console.error('LessonCreationForm: Direct fetch - HTTP Error:', response.status, errorDetails);
+                setMessage(`Direct insert failed: HTTP ${response.status} - ${errorDetails}`);
+            } else {
+                console.log('LessonCreationForm: Direct fetch - Success! Response:', responseText);
+                setMessage('Direct insert successful! Check Supabase table.');
+                fetchCourseDetails(); // Refresh course details to show new lesson
+            }
+        } catch (error) {
+            console.error('LessonCreationForm: !!! CAUGHT ERROR during direct fetch:', error);
+            setMessage(`Direct insert failed: ${error.message}`);
+        } finally {
+            setLoading(false);
+            console.log('LessonCreationForm: Direct fetch test finished.');
+        }
+    };
+
 
     return (
         <div className="border border-dashed border-gray-300 p-4 rounded-md mb-4">
@@ -723,6 +789,14 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                     disabled={loading}
                 >
                     {loading ? 'Adding...' : 'Add Lesson'}
+                </button>
+                <button
+                    type="button" // Important: type="button" to prevent form submission
+                    onClick={testDirectInsert}
+                    className="ml-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-md transition duration-200"
+                    disabled={loading}
+                >
+                    Test Direct Insert (Debug)
                 </button>
             </form>
             {message && (
