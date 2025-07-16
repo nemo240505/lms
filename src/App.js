@@ -166,7 +166,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.9]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.10]`);
 
 
     return (
@@ -1123,12 +1123,13 @@ const AdminDashboard = ({ setCurrentPage }) => {
 // Student Dashboard
 const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
     const { supabase, userProfile } = useContext(AppContext);
-    const [allPublishedCourses, setAllPublishedCourses] = useState([]); // All published courses
-    const [enrolledCourses, setEnrolledCourses] = useState([]);
+    const [allPublishedCourses, setAllPublishedCourses] = useState([]);
+    const [studentEnrollments, setStudentEnrollments] = useState([]); // New state for student's enrollments
     const [searchQuery, setSearchQuery] = useState('');
     const [loadingCourses, setLoadingCourses] = useState(true);
+    const [loadingEnrollments, setLoadingEnrollments] = useState(true);
 
-    // Fetch all published courses once on component mount or supabase client change
+    // Effect to fetch all published courses
     useEffect(() => {
         const fetchAllPublishedCourses = async () => {
             setLoadingCourses(true);
@@ -1148,52 +1149,43 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
         fetchAllPublishedCourses();
     }, [supabase]);
 
-    // Filter and set enrolled courses when userProfile or allPublishedCourses change
+    // Effect to fetch student's enrollments
     useEffect(() => {
-        const filterAndSetCourses = async () => {
-            if (!supabase || !userProfile?.id || !allPublishedCourses.length) {
-                console.log('Skipping filterAndSetCourses: Supabase, userProfile, or allPublishedCourses not ready.');
-                setEnrolledCourses([]); // Clear enrolled courses if prerequisites aren't met
+        const fetchStudentEnrollments = async () => {
+            setLoadingEnrollments(true);
+            if (!supabase || !userProfile?.id) {
+                console.log('Supabase client or user profile not ready for fetching enrollments.');
+                setStudentEnrollments([]);
+                setLoadingEnrollments(false);
                 return;
             }
-
-            console.log('User Profile Registered Exams:', userProfile.registered_exams);
-            console.log('All Published Courses:', allPublishedCourses);
-
-            // Fetch actual enrollments for the student
             const { data, error } = await supabase
                 .from('enrollments')
-                .select('course_id') // Only need course_ids for enrolled courses
+                .select('course_id')
                 .eq('student_id', userProfile.id);
 
             if (error) {
-                console.error('Error fetching enrolled course IDs:', error);
-                setEnrolledCourses([]);
-                return;
+                console.error('Error fetching student enrollments:', error);
+                setStudentEnrollments([]);
+            } else {
+                setStudentEnrollments(data);
             }
-            const enrolledCourseIds = new Set(data.map(e => e.course_id));
-            console.log('Enrolled Course IDs from DB:', Array.from(enrolledCourseIds));
-
-            // Filter all published courses by registered exams AND enrollment status
-            const filteredAndEnrolled = allPublishedCourses.filter(course => {
-                const matchesExamType = userProfile.registered_exams && userProfile.registered_exams.includes(course.exam_type);
-                const isEnrolled = enrolledCourseIds.has(course.id);
-                console.log(`Course: ${course.title}, Exam Type: ${course.exam_type}, Matches User Exams: ${matchesExamType}, Is Enrolled: ${isEnrolled}`);
-                return matchesExamType && isEnrolled;
-            });
-            setEnrolledCourses(filteredAndEnrolled);
+            setLoadingEnrollments(false);
         };
+        fetchStudentEnrollments();
+    }, [supabase, userProfile]); // Depend on supabase and userProfile changes
 
-        // Only run if userProfile is available and courses are loaded
-        if (userProfile && !loadingCourses) {
-            filterAndSetCourses();
-        }
-    }, [userProfile, allPublishedCourses, supabase, loadingCourses]); // Depend on userProfile, allPublishedCourses, supabase, and loadingCourses
+    // Derived state for enrolled courses
+    const enrolledCourseIds = new Set(studentEnrollments.map(e => e.course_id));
+    const enrolledCourses = allPublishedCourses.filter(course =>
+        userProfile?.registered_exams?.includes(course.exam_type) &&
+        enrolledCourseIds.has(course.id)
+    );
 
-    // Filter available courses (not enrolled, and matches registered exams)
+    // Derived state for available courses (not enrolled, and matches registered exams)
     const filteredAvailableCourses = allPublishedCourses.filter(course =>
-        userProfile?.registered_exams?.includes(course.exam_type) && // Ensure user has registered for this exam type
-        !enrolledCourses.some(enrolled => enrolled.id === course.id) && // Not already enrolled
+        userProfile?.registered_exams?.includes(course.exam_type) &&
+        !enrolledCourseIds.has(course.id) &&
         course.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -1213,17 +1205,14 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
             alert('Failed to enroll. You might already be enrolled.');
         } else {
             alert('Enrolled successfully!');
-            // Re-fetch all data to ensure enrolled courses are updated
-            // This will trigger the filterAndSetCourses useEffect
-            setLoadingCourses(true); // Indicate loading while data refreshes
-            if (supabase) {
+            // Re-fetch enrollments to update the UI
+            if (supabase && userProfile?.id) {
                 const { data, error: fetchError } = await supabase
-                    .from('courses')
-                    .select('*')
-                    .eq('published', true);
-                if (fetchError) console.error('Error re-fetching all published courses after enrollment:', fetchError);
-                else setAllPublishedCourses(data);
-                setLoadingCourses(false);
+                    .from('enrollments')
+                    .select('course_id')
+                    .eq('student_id', userProfile.id);
+                if (fetchError) console.error('Error re-fetching enrollments after enrollment:', fetchError);
+                else setStudentEnrollments(data);
             }
         }
     };
@@ -1233,7 +1222,9 @@ const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
         setCurrentPage('courseView');
     };
 
-    if (loadingCourses) return <div className="p-4 sm:p-6 text-center">Loading courses...</div>;
+    if (loadingCourses || loadingEnrollments) {
+        return <div className="p-4 sm:p-6 text-center">Loading courses...</div>;
+    }
 
     return (
         <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
