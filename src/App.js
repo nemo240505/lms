@@ -7,7 +7,7 @@ import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, Chec
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
 // IMPORTANT: Replace 'YOUR_ACTUAL_SUPABASE_ANON_PUBLIC_KEY_HERE' with your actual anon public key from Supabase Project Settings -> API
 // You can find this in your Supabase project settings under "API" -> "Project API keys" -> "anon public"
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptdnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdhd2xsYmt0bXdzd3ptbnp6cG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1Nzc4MTksImV4cCI6MjA2NzE1MzgxOX0.HhDaRGuzP_eyFyrM3ABz29LPkseCEGrQcHZNcjWZazI'; 
 
 // Create a context for Supabase and User data
 const AppContext = createContext();
@@ -158,7 +158,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.4]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.5]`);
 
 
     return (
@@ -569,7 +569,9 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             console.log('LessonCreationForm: Supabase client object for insert:', supabase); // New: Log the client
             // Changed .select() to { returning: 'minimal' } to avoid RLS issues on SELECT
             const { data, error } = await supabase.from('lessons').insert([lessonDataToInsert], { returning: 'minimal' });
-            console.log('LessonCreationForm: Supabase insert call completed.'); // This is also NOT appearing
+            // NEW LOG ADDED HERE
+            console.log('LessonCreationForm: Supabase insert operation returned:', data, error);
+            console.log('LessonCreationForm: Supabase insert call completed.'); 
 
             if (error) {
                 console.error('LessonCreationForm: Error creating lesson (details):', error.message || JSON.stringify(error));
