@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 // Removed direct import for @supabase/supabase-js to load it via CDN script tag
 
-import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, CheckCircle, Download, XCircle } from 'lucide-react';
+import { Home, User, LogOut, BookOpen, PlusCircle, LayoutDashboard, Search, CheckCircle, Download } from 'lucide-react';
 
 // Supabase Configuration (replace with your actual values if different)
 const supabaseUrl = 'https://gawllbktmwswzmvzzpmq.supabase.co';
@@ -178,7 +178,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.13]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.12]`);
 
 
     return (
@@ -247,7 +247,7 @@ const AuthPage = ({ setCurrentPage }) => {
                     console.log('AuthPage: Profile not found after login, setting profile to null:', profileError);
                     setUserProfile(null);
                 } else if (profileError) { // Other types of errors
-                    console.error('AuthPage: Error fetching profile:', profileError);
+                    console.error('AuthPage: Error fetching profile after login:', profileError);
                     setUserProfile(null);
                 } else { // Profile found
                     // Ensure registered_exams is always an array
@@ -511,296 +511,7 @@ const Header = ({ setCurrentPage }) => {
     );
 };
 
-// Quiz Editor Component (New for Admin Dashboard)
-const QuizEditor = ({ moduleId, onQuizCreate, fetchCourseDetails }) => {
-    const { supabase, session } = useContext(AppContext);
-    const [quizTitle, setQuizTitle] = useState('');
-    const [quizDescription, setQuizDescription] = useState('');
-    const [passPercentage, setPassPercentage] = useState(70);
-    const [questions, setQuestions] = useState([]); // Array of { questionText, type, answers: [{ answerText, isCorrect }] }
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
-
-    const handleAddQuestion = () => {
-        setQuestions([...questions, { questionText: '', questionType: 'multiple_choice', answers: [{ answerText: '', isCorrect: false }] }]);
-    };
-
-    const handleQuestionChange = (index, field, value) => {
-        const newQuestions = [...questions];
-        newQuestions[index][field] = value;
-        setQuestions(newQuestions);
-    };
-
-    const handleAddAnswer = (questionIndex) => {
-        const newQuestions = [...questions];
-        newQuestions[questionIndex].answers.push({ answerText: '', isCorrect: false });
-        setQuestions(newQuestions);
-    };
-
-    const handleAnswerChange = (questionIndex, answerIndex, field, value) => {
-        const newQuestions = [...questions];
-        newQuestions[questionIndex].answers[answerIndex][field] = value;
-        setQuestions(newQuestions);
-    };
-
-    const handleCorrectAnswerChange = (questionIndex, correctAnswerIndex) => {
-        const newQuestions = [...questions];
-        newQuestions[questionIndex].answers = newQuestions[questionIndex].answers.map((ans, idx) => ({
-            ...ans,
-            isCorrect: idx === correctAnswerIndex,
-        }));
-        setQuestions(newQuestions);
-    };
-
-    const handleRemoveQuestion = (index) => {
-        const newQuestions = questions.filter((_, i) => i !== index);
-        setQuestions(newQuestions);
-    };
-
-    const handleRemoveAnswer = (questionIndex, answerIndex) => {
-        const newQuestions = [...questions];
-        newQuestions[questionIndex].answers = newQuestions[questionIndex].answers.filter((_, i) => i !== answerIndex);
-        setQuestions(newQuestions);
-    };
-
-    const handleCreateQuiz = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setMessage('Creating quiz...');
-
-        if (!quizTitle || questions.length === 0) {
-            setMessage('Please fill quiz title and add at least one question.');
-            setLoading(false);
-            return;
-        }
-
-        if (!session?.access_token) {
-            setMessage('Not authenticated. Please log in to add quizzes.');
-            setLoading(false);
-            return;
-        }
-
-        try {
-            // 1. Create Quiz Entry
-            const { data: quizData, error: quizError } = await supabase.from('quizzes').insert([
-                {
-                    module_id: moduleId,
-                    title: quizTitle,
-                    description: quizDescription,
-                    pass_percentage: passPercentage,
-                },
-            ]).select().single();
-
-            if (quizError) {
-                console.error('Error creating quiz:', quizError);
-                setMessage(`Error creating quiz: ${quizError.message}`);
-                setLoading(false);
-                return;
-            }
-
-            const quizId = quizData.id;
-
-            // 2. Insert Questions and Answers
-            for (const [qIndex, q] of questions.entries()) {
-                const { data: questionData, error: questionError } = await supabase.from('questions').insert([
-                    {
-                        quiz_id: quizId,
-                        question_text: q.questionText,
-                        question_type: q.questionType,
-                        order: qIndex,
-                    },
-                ]).select().single();
-
-                if (questionError) {
-                    console.error('Error creating question:', questionError);
-                    setMessage(`Error creating question "${q.questionText}": ${questionError.message}`);
-                    setLoading(false);
-                    return;
-                }
-
-                const questionId = questionData.id;
-
-                const answersToInsert = q.answers.map(a => ({
-                    question_id: questionId,
-                    answer_text: a.answerText,
-                    is_correct: a.isCorrect,
-                }));
-
-                const { error: answersError } = await supabase.from('answers').insert(answersToInsert);
-
-                if (answersError) {
-                    console.error('Error creating answers:', answersError);
-                    setMessage(`Error creating answers for question "${q.questionText}": ${answersError.message}`);
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            // 3. Create a Lesson of type 'quiz' linked to this quiz
-            const { error: lessonError } = await supabase.from('lessons').insert([
-                {
-                    module_id: moduleId,
-                    title: quizTitle,
-                    content: quizDescription || 'Take this quiz to test your knowledge!',
-                    type: 'quiz',
-                    quiz_id: quizId,
-                    order: 0, // Simplified ordering
-                },
-            ]);
-
-            if (lessonError) {
-                console.error('Error creating lesson for quiz:', lessonError);
-                setMessage(`Quiz created, but failed to create associated lesson: ${lessonError.message}`);
-                setLoading(false);
-                return;
-            }
-
-            setMessage('Quiz and associated lesson created successfully!');
-            setQuizTitle('');
-            setQuizDescription('');
-            setPassPercentage(70);
-            setQuestions([]);
-            fetchCourseDetails(); // Re-fetch course details to update UI
-            onQuizCreate(); // Callback to parent to hide quiz editor
-        } catch (error) {
-            console.error('Unexpected error during quiz creation:', error);
-            setMessage(`An unexpected error occurred: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="border border-dashed border-purple-300 p-4 rounded-md mb-4 bg-purple-50">
-            <h4 className="text-lg font-medium text-purple-800 mb-3">Create New Quiz</h4>
-            <form onSubmit={handleCreateQuiz} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Quiz Title</label>
-                    <input
-                        type="text"
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                        value={quizTitle}
-                        onChange={(e) => setQuizTitle(e.target.value)}
-                        required
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Quiz Description (Optional)</label>
-                    <textarea
-                        rows="2"
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                        value={quizDescription}
-                        onChange={(e) => setQuizDescription(e.target.value)}
-                    ></textarea>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700">Pass Percentage</label>
-                    <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                        value={passPercentage}
-                        onChange={(e) => setPassPercentage(parseInt(e.target.value) || 0)}
-                        required
-                    />
-                </div>
-
-                <h5 className="text-md font-medium text-gray-700 mt-4">Questions:</h5>
-                {questions.map((q, qIndex) => (
-                    <div key={qIndex} className="border border-gray-200 p-3 rounded-md bg-white shadow-sm">
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-medium text-gray-700">Question {qIndex + 1}</label>
-                            <button
-                                type="button"
-                                onClick={() => handleRemoveQuestion(qIndex)}
-                                className="text-red-500 hover:text-red-700 text-sm"
-                            >
-                                Remove Question
-                            </button>
-                        </div>
-                        <input
-                            type="text"
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 mb-2"
-                            placeholder="Question text"
-                            value={q.questionText}
-                            onChange={(e) => handleQuestionChange(qIndex, 'questionText', e.target.value)}
-                            required
-                        />
-                        {/* Currently only multiple choice, but can expand questionType later */}
-                        {/* <select
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 mb-2"
-                            value={q.questionType}
-                            onChange={(e) => handleQuestionChange(qIndex, 'questionType', e.target.value)}
-                        >
-                            <option value="multiple_choice">Multiple Choice</option>
-                        </select> */}
-
-                        <h6 className="text-sm font-medium text-gray-700 mt-3 mb-1">Answers:</h6>
-                        {q.answers.map((a, aIndex) => (
-                            <div key={aIndex} className="flex items-center space-x-2 mb-2">
-                                <input
-                                    type="radio"
-                                    name={`correctAnswer-${qIndex}`}
-                                    checked={a.isCorrect}
-                                    onChange={() => handleCorrectAnswerChange(qIndex, aIndex)}
-                                    className="form-radio h-4 w-4 text-blue-600"
-                                />
-                                <input
-                                    type="text"
-                                    className="block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm"
-                                    placeholder={`Answer ${aIndex + 1}`}
-                                    value={a.answerText}
-                                    onChange={(e) => handleAnswerChange(qIndex, aIndex, 'answerText', e.target.value)}
-                                    required
-                                />
-                                {q.answers.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveAnswer(qIndex, aIndex)}
-                                        className="text-red-400 hover:text-red-600"
-                                    >
-                                        <XCircle size={16} />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                        <button
-                            type="button"
-                            onClick={() => handleAddAnswer(qIndex)}
-                            className="mt-2 bg-blue-400 hover:bg-blue-500 text-white text-sm py-1 px-3 rounded-md"
-                        >
-                            Add Answer
-                        </button>
-                    </div>
-                ))}
-                <button
-                    type="button"
-                    onClick={handleAddQuestion}
-                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center space-x-2"
-                >
-                    <PlusCircle size={20} />
-                    <span>Add Question</span>
-                </button>
-                <button
-                    type="submit"
-                    className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-200 w-full"
-                    disabled={loading}
-                >
-                    {loading ? 'Creating Quiz...' : 'Create Quiz'}
-                </button>
-            </form>
-            {message && (
-                <div className="mt-3 p-2 bg-blue-100 text-blue-700 rounded text-sm">
-                    {message}
-                </div>
-            )}
-        </div>
-    );
-};
-
-
-// Lesson Creation Form Component (Updated to include Quiz)
+// Lesson Creation Form Component
 const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) => {
     const { supabase, session } = useContext(AppContext); // Also get session for direct fetch
     const [newLessonTitle, setNewLessonTitle] = useState('');
@@ -812,7 +523,6 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
     const [newLessonDocumentFile, setNewLessonDocumentFile] = useState(null); // State for document file upload
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
-    const [showQuizEditor, setShowQuizEditor] = useState(false); // State to toggle QuizEditor
 
     const handleCreateLesson = async (e) => {
         e.preventDefault();
@@ -820,7 +530,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
         setMessage('Adding lesson...'); // Provide immediate feedback
         console.log('LessonCreationForm: Starting lesson creation process...');
 
-        if (newLessonType !== 'quiz' && (!newLessonTitle || !newLessonContent)) {
+        if (!newLessonTitle || !newLessonContent) {
             setMessage('Please fill lesson title and content.');
             setLoading(false);
             return;
@@ -829,13 +539,6 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
         if (!session?.access_token) {
             setMessage('Not authenticated. Please log in to add lessons.');
             setLoading(false);
-            return;
-        }
-
-        if (newLessonType === 'quiz') {
-            setShowQuizEditor(true); // Show the QuizEditor instead of proceeding here
-            setLoading(false);
-            setMessage(''); // Clear message
             return;
         }
 
@@ -891,7 +594,6 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                 type: newLessonType,
                 video_url: finalVideoUrl,
                 document_url: finalDocumentUrl,
-                quiz_id: null, // Ensure quiz_id is null for non-quiz lessons
                 order: 0, // Simplified ordering
             };
             console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
@@ -950,16 +652,6 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
         }
     };
 
-    if (showQuizEditor) {
-        return (
-            <QuizEditor
-                moduleId={moduleId}
-                onQuizCreate={() => setShowQuizEditor(false)} // Hide editor on successful creation
-                fetchCourseDetails={fetchCourseDetails}
-            />
-        );
-    }
-
     return (
         <div className="border border-dashed border-gray-300 p-4 rounded-md mb-4">
             <h4 className="text-lg font-medium text-gray-700 mb-3">Add New Lesson</h4>
@@ -974,7 +666,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                         placeholder="Lesson Title"
                         value={newLessonTitle}
                         onChange={(e) => setNewLessonTitle(e.target.value)}
-                        required={newLessonType !== 'quiz'} // Only required for non-quiz lessons
+                        required
                     />
                 </div>
                 <div>
@@ -987,7 +679,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                         placeholder="Detailed lesson content (text, instructions, etc.)"
                         value={newLessonContent}
                         onChange={(e) => setNewLessonContent(e.target.value)}
-                        required={newLessonType !== 'quiz'} // Only required for non-quiz lessons
+                        required
                     ></textarea>
                 </div>
                 <div>
@@ -999,19 +691,16 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                         value={newLessonType}
                         onChange={(e) => {
                             setNewLessonType(e.target.value);
-                            setNewLessonTitle(''); // Clear fields when type changes
-                            setNewLessonContent('');
-                            setNewLessonVideoUrl('');
+                            setNewLessonVideoUrl(''); // Clear URLs when type changes
                             setNewLessonDocumentUrl('');
-                            setNewLessonVideoFile(null);
-                            setNewLessonDocumentFile(null);
-                            setShowQuizEditor(e.target.value === 'quiz'); // Show quiz editor if type is quiz
+                            setNewLessonVideoFile(null); // Clear file input state
+                            setNewLessonDocumentFile(null); // Clear file input state
                         }}
                     >
                         <option value="text">Text</option>
                         <option value="video">Video</option>
                         <option value="document">Document</option>
-                        <option value="quiz">Quiz</option>
+                        {/* <option value="quiz">Quiz</option> */}
                     </select>
                 </div>
 
@@ -1236,10 +925,9 @@ const AdminDashboard = ({ setCurrentPage }) => {
 
     const fetchCourseDetails = async (courseId) => {
         if (!supabase) return;
-        // Fetch lessons and quizzes for the selected course
         const { data: courseData, error: courseError } = await supabase
             .from('courses')
-            .select('*, modules(*, lessons(*), quizzes(*))') // Include quizzes in the fetch
+            .select('*, modules(*, lessons(*))')
             .eq('id', courseId)
             .order('order', { foreignTable: 'modules', ascending: true })
             .order('order', { foreignTable: 'modules.lessons', ascending: true })
@@ -1403,7 +1091,6 @@ const AdminDashboard = ({ setCurrentPage }) => {
                                             <p className="text-sm text-gray-600 truncate">{lesson.content}</p>
                                             {lesson.video_url && <p className="text-xs text-blue-500">Video: <a href={lesson.video_url} target="_blank" rel="noopener noreferrer" className="underline">{lesson.video_url}</a></p>}
                                             {lesson.document_url && <p className="text-xs text-blue-500">Doc: <a href={lesson.document_url} target="_blank" rel="noopener noreferrer" className="underline">{lesson.document_url}</a></p>}
-                                            {lesson.quiz_id && <p className="text-xs text-purple-500">Quiz ID: {lesson.quiz_id}</p>}
 
                                             <div className="mt-2 space-y-2">
                                                 {/* These are for updating existing lessons with files */}
@@ -1444,230 +1131,6 @@ const AdminDashboard = ({ setCurrentPage }) => {
         </div>
     );
 };
-
-// Quiz Taker Component (New for Student Course View)
-const QuizTaker = ({ quizId, studentId, onQuizComplete, supabase }) => {
-    const [quiz, setQuiz] = useState(null);
-    const [questions, setQuestions] = useState([]);
-    const [selectedAnswers, setSelectedAnswers] = useState({}); // { questionId: answerId }
-    const [showResults, setShowResults] = useState(false);
-    const [score, setScore] = useState(0);
-    const [passed, setPassed] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [message, setMessage] = useState('');
-
-    useEffect(() => {
-        const fetchQuizData = async () => {
-            setLoading(true);
-            setMessage('');
-            try {
-                // Fetch quiz details
-                const { data: quizData, error: quizError } = await supabase
-                    .from('quizzes')
-                    .select('*, questions(*, answers(*))')
-                    .eq('id', quizId)
-                    .order('order', { foreignTable: 'questions', ascending: true })
-                    .single();
-
-                if (quizError) {
-                    throw quizError;
-                }
-
-                setQuiz(quizData);
-                setQuestions(quizData.questions || []);
-                setLoading(false);
-            } catch (error) {
-                console.error('Error fetching quiz data:', error);
-                setMessage(`Error loading quiz: ${error.message}`);
-                setLoading(false);
-            }
-        };
-
-        if (quizId && studentId && supabase) {
-            fetchQuizData();
-            // Check for existing attempt
-            const checkAttempt = async () => {
-                const { data: attempts, error } = await supabase
-                    .from('quiz_attempts')
-                    .select('*')
-                    .eq('student_id', studentId)
-                    .eq('quiz_id', quizId)
-                    .order('completed_at', { ascending: false })
-                    .limit(1);
-
-                if (error) {
-                    console.error('Error checking quiz attempts:', error);
-                } else if (attempts && attempts.length > 0) {
-                    const latestAttempt = attempts[0];
-                    setScore(latestAttempt.score);
-                    setPassed(latestAttempt.passed);
-                    setShowResults(true);
-                    setMessage(`You scored ${latestAttempt.score}% on your last attempt. ${latestAttempt.passed ? 'Passed!' : 'Failed.'}`);
-                }
-            };
-            checkAttempt();
-        }
-    }, [quizId, studentId, supabase]);
-
-    const handleAnswerSelect = (questionId, answerId) => {
-        setSelectedAnswers((prev) => ({
-            ...prev,
-            [questionId]: answerId,
-        }));
-    };
-
-    const handleSubmitQuiz = async () => {
-        setLoading(true);
-        setMessage('Submitting quiz...');
-        let correctAnswersCount = 0;
-        const totalQuestions = questions.length;
-        const attemptData = {};
-
-        questions.forEach(q => {
-            const selectedAnswerId = selectedAnswers[q.id];
-            const correctAnswer = q.answers.find(a => a.is_correct);
-
-            attemptData[q.id] = {
-                questionText: q.question_text,
-                selectedAnswer: selectedAnswerId ? q.answers.find(a => a.id === selectedAnswerId)?.answer_text : null,
-                correctAnswer: correctAnswer?.answer_text,
-                isCorrect: selectedAnswerId === correctAnswer?.id,
-            };
-
-            if (selectedAnswerId === correctAnswer?.id) {
-                correctAnswersCount++;
-            }
-        });
-
-        const calculatedScore = totalQuestions > 0 ? Math.round((correctAnswersCount / totalQuestions) * 100) : 0;
-        const hasPassed = calculatedScore >= quiz.pass_percentage;
-
-        setScore(calculatedScore);
-        setPassed(hasPassed);
-
-        try {
-            const { error } = await supabase.from('quiz_attempts').insert([
-                {
-                    student_id: studentId,
-                    quiz_id: quizId,
-                    score: calculatedScore,
-                    completed_at: new Date().toISOString(),
-                    passed: hasPassed,
-                    attempt_data: attemptData, // Store the detailed attempt data
-                },
-            ]);
-
-            if (error) {
-                throw error;
-            }
-
-            setMessage('Quiz submitted successfully!');
-            setShowResults(true);
-            onQuizComplete(); // Notify parent component
-        } catch (error) {
-            console.error('Error submitting quiz:', error);
-            setMessage(`Error submitting quiz: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
-        return <div className="p-4 text-center">Loading quiz...</div>;
-    }
-
-    if (message && message.includes('Error loading quiz')) {
-        return <div className="p-4 text-center text-red-600">{message}</div>;
-    }
-
-    if (!quiz) {
-        return <div className="p-4 text-center">Quiz not found.</div>;
-    }
-
-    return (
-        <div className="p-4 bg-white rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{quiz.title}</h2>
-            <p className="text-gray-600 mb-4">{quiz.description}</p>
-            <p className="text-sm text-gray-500 mb-4">Pass Percentage: {quiz.pass_percentage}%</p>
-
-            {showResults ? (
-                <div className="mt-6 p-4 border rounded-md bg-blue-50">
-                    <h3 className="text-xl font-semibold text-blue-800 mb-2">Your Results</h3>
-                    <p className="text-lg">Score: <span className="font-bold">{score}%</span></p>
-                    <p className="text-lg">Status: <span className={`font-bold ${passed ? 'text-green-600' : 'text-red-600'}`}>{passed ? 'Passed!' : 'Failed!'}</span></p>
-                    <div className="mt-4 space-y-4">
-                        {questions.map((q) => {
-                            const studentAnswer = q.answers.find(a => a.id === selectedAnswers[q.id]);
-                            const correctAnswer = q.answers.find(a => a.is_correct);
-                            const isCorrect = studentAnswer?.id === correctAnswer?.id;
-
-                            return (
-                                <div key={q.id} className="border-b pb-3">
-                                    <p className="font-semibold">{q.question_text}</p>
-                                    <p className="text-sm text-gray-700">Your Answer: <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>{studentAnswer ? studentAnswer.answer_text : 'No answer'}</span></p>
-                                    {!isCorrect && correctAnswer && (
-                                        <p className="text-sm text-gray-700">Correct Answer: <span className="text-green-600">{correctAnswer.answer_text}</span></p>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <button
-                        onClick={() => {
-                            setShowResults(false);
-                            setSelectedAnswers({});
-                            setScore(0);
-                            setPassed(false);
-                            setMessage('');
-                        }}
-                        className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-200"
-                    >
-                        Retake Quiz
-                    </button>
-                </div>
-            ) : (
-                <form onSubmit={(e) => { e.preventDefault(); handleSubmitQuiz(); }} className="space-y-6">
-                    {questions.map((q, qIndex) => (
-                        <div key={q.id} className="border border-gray-200 p-4 rounded-md bg-gray-50">
-                            <p className="font-semibold text-lg mb-3">
-                                {qIndex + 1}. {q.question_text}
-                            </p>
-                            <div className="space-y-2">
-                                {q.answers.map((a) => (
-                                    <label key={a.id} className="flex items-center space-x-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name={`question-${q.id}`}
-                                            value={a.id}
-                                            checked={selectedAnswers[q.id] === a.id}
-                                            onChange={() => handleAnswerSelect(q.id, a.id)}
-                                            className="form-radio h-5 w-5 text-blue-600"
-                                            required
-                                        />
-                                        <span className="text-gray-700">{a.answer_text}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                    <button
-                        type="submit"
-                        className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-200"
-                        disabled={loading}
-                    >
-                        {loading ? 'Submitting...' : 'Submit Quiz'}
-                    </button>
-                </form>
-            )}
-            {message && (
-                <div className="mt-4 p-3 bg-blue-100 text-blue-700 rounded text-center">
-                    {message}
-                </div>
-            )}
-        </div>
-    );
-};
-
 
 // Student Dashboard
 const StudentDashboard = ({ setCurrentPage, setSelectedCourseId }) => {
@@ -1874,7 +1337,7 @@ const CourseView = ({ courseId, setCurrentPage }) => {
         if (!supabase) return;
         const { data: courseData, error: courseError } = await supabase
             .from('courses')
-            .select('*, modules(*, lessons(*), quizzes(*, questions(*, answers(*))))') // Fetch quizzes and their questions/answers
+            .select('*, modules(*, lessons(*))')
             .eq('id', courseId)
             .order('order', { foreignTable: 'modules', ascending: true })
             .order('order', { foreignTable: 'modules.lessons', ascending: true })
@@ -1893,15 +1356,8 @@ const CourseView = ({ courseId, setCurrentPage }) => {
         if (courseData.modules && courseData.modules.length > 0 && courseData.modules[0].lessons && courseData.modules[0].lessons.length > 0) {
             const firstLesson = courseData.modules[0].lessons[0];
             // Only update selectedLesson if it's different to prevent re-render loop
-            // And ensure that if a quiz lesson is selected, its quiz data is properly linked
             if (!selectedLesson || selectedLesson.id !== firstLesson.id) {
-                if (firstLesson.type === 'quiz' && firstLesson.quiz_id) {
-                    // Find the corresponding quiz data
-                    const quiz = courseData.modules[0].quizzes?.find(q => q.id === firstLesson.quiz_id);
-                    setSelectedLesson({ ...firstLesson, quizData: quiz });
-                } else {
-                    setSelectedLesson(firstLesson);
-                }
+                setSelectedLesson(firstLesson);
             }
         }
         setLoading(false);
@@ -1977,7 +1433,7 @@ const CourseView = ({ courseId, setCurrentPage }) => {
 
             <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                 {/* Modules & Lessons Sidebar */}
-                <div className="lg:w-1/4 w-full bg-white p-4 sm:p-6 rounded-lg shadow-md">
+                <div className="lg:w-1/4 bg-white p-4 sm:p-6 rounded-lg shadow-md">
                     <h2 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3 sm:mb-4">Course Content</h2>
                     <nav className="space-y-3 sm:space-y-4">
                         {course.modules && course.modules.map((module) => (
@@ -1987,21 +1443,14 @@ const CourseView = ({ courseId, setCurrentPage }) => {
                                     {module.lessons && module.lessons.map((lesson) => (
                                         <li
                                             key={lesson.id}
-                                            onClick={() => {
-                                                if (lesson.type === 'quiz' && lesson.quiz_id) {
-                                                    const quiz = module.quizzes?.find(q => q.id === lesson.quiz_id);
-                                                    setSelectedLesson({ ...lesson, quizData: quiz });
-                                                } else {
-                                                    setSelectedLesson(lesson);
-                                                }
-                                            }}
+                                            onClick={() => setSelectedLesson(lesson)}
                                             className={`cursor-pointer p-2 rounded-md transition-colors flex items-center space-x-2
                                                 ${selectedLesson?.id === lesson.id ? 'bg-blue-100 text-blue-800 font-semibold' : 'hover:bg-gray-100 text-gray-700'}
                                                 ${progress[lesson.id] ? 'text-green-700' : ''}
                                             `}
                                         >
                                             {progress[lesson.id] && <CheckCircle size={16} className="text-green-500" />}
-                                            <span className="text-sm sm:text-base">{lesson.title} {lesson.type === 'quiz' && '(Quiz)'}</span>
+                                            <span className="text-sm sm:text-base">{lesson.title}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -2011,76 +1460,67 @@ const CourseView = ({ courseId, setCurrentPage }) => {
                 </div>
 
                 {/* Lesson Content Area */}
-                <div className="lg:w-3/4 w-full bg-white p-4 sm:p-6 rounded-lg shadow-md">
+                <div className="lg:w-3/4 bg-white p-4 sm:p-6 rounded-lg shadow-md">
                     {selectedLesson ? (
-                        selectedLesson.type === 'quiz' ? (
-                            <QuizTaker
-                                quizId={selectedLesson.quiz_id}
-                                studentId={userProfile?.id}
-                                supabase={supabase}
-                                onQuizComplete={() => handleLessonCompleteToggle(selectedLesson.id, false)} // Mark lesson complete on quiz finish
-                            />
-                        ) : (
-                            <div>
-                                <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">{selectedLesson.title}</h2>
-                                {selectedLesson.video_url && (
-                                    <div className="mb-4 aspect-video bg-black rounded-lg overflow-hidden">
-                                        {videoLoadError ? (
-                                            <div className="flex items-center justify-center h-full text-white text-center p-4 bg-red-800">
-                                                <p>
-                                                    Error loading video. It might be due to embedding restrictions (for YouTube) or an inaccessible file (for direct links).
-                                                    Please try a different video URL or upload the video directly via the Admin Dashboard.
-                                                </p>
-                                            </div>
-                                        ) : youtubeVideoId ? (
-                                            <iframe
-                                                className="w-full h-full"
-                                                src={`https://www.youtube.com/embed/${youtubeVideoId}`}
-                                                title="YouTube video player"
-                                                frameBorder="0"
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                allowFullScreen
-                                                onError={() => {
-                                                    console.error("YouTube iframe failed to load.");
-                                                    setVideoLoadError(true);
-                                                }}
-                                            ></iframe>
-                                        ) : (
-                                            <video
-                                                controls
-                                                className="w-full h-full"
-                                                onError={() => {
-                                                    console.error("Video tag failed to load.");
-                                                    setVideoLoadError(true);
-                                                }}
-                                            >
-                                                <source src={selectedLesson.video_url} type="video/mp4" />
-                                                Your browser does not support the video tag.
-                                            </video>
-                                        )}
-                                    </div>
-                                )}
-                                <div className="prose max-w-none mb-4 sm:mb-6 text-gray-700 text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: selectedLesson.content }} />
-                                {selectedLesson.document_url && (
-                                    <button
-                                        onClick={() => handleDownload(selectedLesson.document_url, `${selectedLesson.title}.pdf`)}
-                                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center space-x-2 mb-4"
-                                    >
-                                        <Download size={20} />
-                                        <span>Download Document</span>
-                                    </button>
-                                )}
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">{selectedLesson.title}</h2>
+                            {selectedLesson.video_url && (
+                                <div className="mb-4 aspect-video bg-black rounded-lg overflow-hidden">
+                                    {videoLoadError ? (
+                                        <div className="flex items-center justify-center h-full text-white text-center p-4 bg-red-800">
+                                            <p>
+                                                Error loading video. It might be due to embedding restrictions (for YouTube) or an inaccessible file (for direct links).
+                                                Please try a different video URL or upload the video directly via the Admin Dashboard.
+                                            </p>
+                                        </div>
+                                    ) : youtubeVideoId ? (
+                                        <iframe
+                                            className="w-full h-full"
+                                            src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+                                            title="YouTube video player"
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            onError={() => {
+                                                console.error("YouTube iframe failed to load.");
+                                                setVideoLoadError(true);
+                                            }}
+                                        ></iframe>
+                                    ) : (
+                                        <video
+                                            controls
+                                            className="w-full h-full"
+                                            onError={() => {
+                                                console.error("Video tag failed to load.");
+                                                setVideoLoadError(true);
+                                            }}
+                                        >
+                                            <source src={selectedLesson.video_url} type="video/mp4" />
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    )}
+                                </div>
+                            )}
+                            <div className="prose max-w-none mb-4 sm:mb-6 text-gray-700 text-sm sm:text-base" dangerouslySetInnerHTML={{ __html: selectedLesson.content }} />
+                            {selectedLesson.document_url && (
                                 <button
-                                    onClick={() => handleLessonCompleteToggle(selectedLesson.id, progress[selectedLesson.id])}
-                                    className={`py-2 px-4 rounded-md font-bold transition duration-200 flex items-center space-x-2 ${
-                                        progress[selectedLesson.id] ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
-                                    }`}
+                                    onClick={() => handleDownload(selectedLesson.document_url, `${selectedLesson.title}.pdf`)}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center space-x-2 mb-4"
                                 >
-                                    <CheckCircle size={20} />
-                                    <span>{progress[selectedLesson.id] ? 'Mark as Incomplete' : 'Mark as Complete'}</span>
+                                    <Download size={20} />
+                                    <span>Download Document</span>
                                 </button>
-                            </div>
-                        )
+                            )}
+                            <button
+                                onClick={() => handleLessonCompleteToggle(selectedLesson.id, progress[selectedLesson.id])}
+                                className={`py-2 px-4 rounded-md font-bold transition duration-200 flex items-center space-x-2 ${
+                                    progress[selectedLesson.id] ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
+                                }`}
+                            >
+                                <CheckCircle size={20} />
+                                <span>{progress[selectedLesson.id] ? 'Mark as Incomplete' : 'Mark as Complete'}</span>
+                            </button>
+                        </div>
                     ) : (
                         <p className="text-gray-600 text-center py-6 sm:py-10 text-sm sm:text-base">Select a lesson from the left to view its content.</p>
                     )}
