@@ -158,7 +158,7 @@ const AppProvider = ({ children }) => {
     // Overall loading state includes waiting for scripts and initial data
     const overallLoading = loading || !scriptsLoaded || !supabaseClient;
     // Added a version identifier to the log
-    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.7]`);
+    console.log(`AppProvider: Current loading state: ${overallLoading} (loading: ${loading}, scriptsLoaded: ${scriptsLoaded}, supabaseClient: ${!!supabaseClient}) [App v2.8]`);
 
 
     return (
@@ -508,6 +508,12 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             return;
         }
 
+        if (!session?.access_token) {
+            setMessage('Not authenticated. Please log in to add lessons.');
+            setLoading(false);
+            return;
+        }
+
         let finalVideoUrl = newLessonVideoUrl;
         let finalDocumentUrl = newLessonDocumentUrl;
 
@@ -564,82 +570,12 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
             };
             console.log('LessonCreationForm: Data for lessons table insert:', lessonDataToInsert);
 
-            // Define a timeout promise
-            const timeout = new Promise((resolve, reject) => {
-                const id = setTimeout(() => {
-                    clearTimeout(id);
-                    reject(new Error('Supabase insert operation timed out after 10 seconds.'));
-                }, 10000); // 10 seconds timeout
-            });
-            
-            let insertResult;
-            try {
-                // Use Promise.race to race the insert operation against the timeout
-                insertResult = await Promise.race([
-                    supabase.from('lessons').insert([lessonDataToInsert], { returning: 'minimal' }),
-                    timeout
-                ]);
-                console.log('LessonCreationForm: Supabase insert operation returned:', insertResult.data, insertResult.error);
-            } catch (insertCallError) {
-                console.error('LessonCreationForm: ERROR CAUGHT DIRECTLY FROM INSERT CALL (or timeout):', insertCallError);
-                setMessage(`Error during lesson insert: ${insertCallError.message}`);
-                setLoading(false);
-                return; // Exit if the insert call itself throws an error or times out
-            }
-
-            console.log('LessonCreationForm: Supabase insert call completed.'); 
-
-            if (insertResult.error) {
-                console.error('LessonCreationForm: Error creating lesson (details):', insertResult.error.message || JSON.stringify(insertResult.error));
-                setMessage(`Error creating lesson: ${insertResult.error.message || 'Unknown error. Check console.'}`);
-            } else {
-                console.log('LessonCreationForm: Lesson created successfully. Data:', insertResult.data);
-                setMessage('Lesson created successfully!');
-                setNewLessonTitle('');
-                setNewLessonContent('');
-                setNewLessonType('text');
-                setNewLessonVideoUrl('');
-                setNewLessonDocumentUrl('');
-                setNewLessonVideoFile(null); // Clear file input state
-                setNewLessonDocumentFile(null); // Clear file input state
-                // onLessonCreate(data[0]); // Data will be null with returning: 'minimal', so skip this or adjust
-                fetchCourseDetails(); // Trigger a re-fetch of course details in AdminDashboard
-            }
-        } catch (outerCatchError) { // This catches any errors from file uploads or other parts of the try block
-            console.error('LessonCreationForm: !!! CAUGHT UNEXPECTED OUTER ERROR during lesson creation:', outerCatchError); // Enhanced log
-            setMessage(`An unexpected error occurred: ${outerCatchError.message}`);
-        } finally {
-            setLoading(false);
-            console.log('LessonCreationForm: Lesson creation process finished.');
-        }
-    };
-
-    // New function for direct fetch test
-    const testDirectInsert = async () => {
-        setLoading(true);
-        setMessage('Testing direct insert...');
-        console.log('LessonCreationForm: Starting direct fetch test...');
-
-        if (!session?.access_token) {
-            setMessage('Not authenticated. Please log in to test direct insert.');
-            setLoading(false);
-            return;
-        }
-
-        const testLessonData = {
-            module_id: moduleId,
-            title: 'Direct Test Lesson ' + Date.now(),
-            content: 'This lesson was inserted using a direct fetch call.',
-            type: 'text',
-            order: 999,
-        };
-
-        try {
+            // --- Direct Fetch API Call for Lesson Insertion ---
+            console.log('LessonCreationForm: Attempting direct fetch insert...');
             console.log('LessonCreationForm: Direct fetch - URL:', `${supabaseUrl}/rest/v1/lessons`);
-            console.log('LessonCreationForm: Direct fetch - Payload:', testLessonData);
+            console.log('LessonCreationForm: Direct fetch - Payload:', lessonDataToInsert);
             console.log('LessonCreationForm: Direct fetch - Headers (Authorization):', `Bearer ${session.access_token}`);
             console.log('LessonCreationForm: Direct fetch - Headers (apikey):', supabaseAnonKey);
-
 
             const response = await fetch(`${supabaseUrl}/rest/v1/lessons`, {
                 method: 'POST',
@@ -648,7 +584,7 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                     'Authorization': `Bearer ${session.access_token}`, // Use authenticated session token
                     'apikey': supabaseAnonKey, // Supabase requires this header
                 },
-                body: JSON.stringify(testLessonData),
+                body: JSON.stringify(lessonDataToInsert),
             });
 
             console.log('LessonCreationForm: Direct fetch - Response received.');
@@ -664,21 +600,29 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                     // Not JSON, use raw text
                 }
                 console.error('LessonCreationForm: Direct fetch - HTTP Error:', response.status, errorDetails);
-                setMessage(`Direct insert failed: HTTP ${response.status} - ${errorDetails}`);
+                setMessage(`Error creating lesson: HTTP ${response.status} - ${errorDetails}`);
             } else {
-                console.log('LessonCreationForm: Direct fetch - Success! Response:', responseText);
-                setMessage('Direct insert successful! Check Supabase table.');
-                fetchCourseDetails(); // Refresh course details to show new lesson
+                console.log('LessonCreationForm: Lesson created successfully via direct fetch!');
+                setMessage('Lesson created successfully!');
+                setNewLessonTitle('');
+                setNewLessonContent('');
+                setNewLessonType('text');
+                setNewLessonVideoUrl('');
+                setNewLessonDocumentUrl('');
+                setNewLessonVideoFile(null); // Clear file input state
+                setNewLessonDocumentFile(null); // Clear file input state
+                fetchCourseDetails(); // Trigger a re-fetch of course details in AdminDashboard
             }
-        } catch (error) {
-            console.error('LessonCreationForm: !!! CAUGHT ERROR during direct fetch:', error);
-            setMessage(`Direct insert failed: ${error.message}`);
+            // --- End Direct Fetch API Call ---
+
+        } catch (outerCatchError) { // This catches any errors from file uploads or other parts of the try block
+            console.error('LessonCreationForm: !!! CAUGHT UNEXPECTED OUTER ERROR during lesson creation:', outerCatchError); // Enhanced log
+            setMessage(`An unexpected error occurred: ${outerCatchError.message}`);
         } finally {
             setLoading(false);
-            console.log('LessonCreationForm: Direct fetch test finished.');
+            console.log('LessonCreationForm: Lesson creation process finished.');
         }
     };
-
 
     return (
         <div className="border border-dashed border-gray-300 p-4 rounded-md mb-4">
@@ -808,14 +752,6 @@ const LessonCreationForm = ({ moduleId, onLessonCreate, fetchCourseDetails }) =>
                     disabled={loading}
                 >
                     {loading ? 'Adding...' : 'Add Lesson'}
-                </button>
-                <button
-                    type="button" // Important: type="button" to prevent form submission
-                    onClick={testDirectInsert}
-                    className="ml-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-md transition duration-200"
-                    disabled={loading}
-                >
-                    Test Direct Insert (Debug)
                 </button>
             </form>
             {message && (
